@@ -1,0 +1,47 @@
+# ── Runtime state (never in the source tree) ────────────────────────────
+# The git working tree holds code only, so `los update` can hard-reset it.
+run/
+log/
+var/
+config.json
+config.json.bak
+
+# ── Virtual environments (rebuilt from requirements.txt) ────────────────
+ssl_venv/
+whatsapp_mcp/whatsapp_venv/
+
+# ── Browser session / channel state ─────────────────────────────────────
+whatsapp_mcp/whatsapp_session/
+
+# ── Logs and pids ────────────────────────────────────────────────────────
+# aicall.log now lives under log/ (covered by the log/ rule above) rather
+# than inside aicall/ itself.  These remain for anyone still on the old
+# per-service log locations from before the gateway existed.
+*.log
+*.pid
+whatsapp_mcp/server.log
+loscron/loscron.log
+loscron/loscron.pid
+aicall/aicall.log
+ssl_server/server.log
+
+# ── Secrets ─────────────────────────────────────────────────────────────
+ssl_server/ssl/
+ssl_server/ssl/old/
+
+# ── Python bytecode ─────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+
+# ── Editor / backup cruft ───────────────────────────────────────────────
+*.bak
+*.bak.[0-9]*
+*.orig
+*.rej
+*~
+.DS_Store
+
+# ── Misc ────────────────────────────────────────────────────────────────
+losweb/
+aicall/agent_sessions.json
+

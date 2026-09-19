@@ -1,0 +1,16 @@
+{
+    "servers": [
+        {
+            "name": "aicall-actions",
+            "url": "http://127.0.0.1:5100"
+        },
+        {
+            "name": "memory-management",
+            "url": "http://127.0.0.1:5102"
+        },
+        {
+            "name": "whatsapp-messaging",
+            "url": "http://127.0.0.1:5101"
+        }
+    ]
+}

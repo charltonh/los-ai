@@ -1,0 +1,144 @@
+LOS — Layered Organization System
+Copyright © 2025–2026 Charlton Harrison, doing business as "Dynet"
+("Licensor", "Dynet"). All Rights Reserved except as expressly granted below.
+
+This software and its documentation (the "Software") is dual-licensed under the
+terms of either:
+
+  1. the GNU General Public License version 3.0 only ("GPL-3.0"), OR
+  2. the Dynet Commercial License ("Commercial License", required for
+     Qualifying Commercial Use as defined in Section 3),
+
+at your option, subject to the conditions of this LICENSE. The full text of
+GPL-3.0 is included in this repository as GPL-3.0.txt and is incorporated by
+reference. If the Software is used, copied, modified, distributed, or hosted
+without a valid Commercial License, the GPL-3.0 applies in full, and nothing
+in this LICENSE limits or excuses any obligation under GPL-3.0.
+
+================================================================================
+SECTION 1: GRANT UNDER GPL-3.0
+================================================================================
+
+The Software is free software: you may redistribute it and/or modify it under
+the terms of GPL-3.0 as published by the Free Software Foundation.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See GPL-3.0 (Section 15, 16) for details.
+
+================================================================================
+SECTION 2: COPYRIGHT AND OWNERSHIP
+================================================================================
+
+The Software is the original work of the Licensor. The Licensor retains all
+right, title, and interest in and to the Software, including all copyrights,
+trade secrets, and all other intellectual property rights not expressly granted
+herein. Nothing in this LICENSE transfers ownership.
+
+Removal or alteration of this copyright notice, or of any attribution notice
+contained in the Software, is prohibited under either license and constitutes
+copyright infringement in addition to any breach of contract.
+
+================================================================================
+SECTION 3: QUALIFYING COMMERCIAL USE (COMMERCIAL LICENSE REQUIRED)
+================================================================================
+
+Use of the Software constitutes acceptance of this LICENSE and of the license
+path selected below. The GPL-3.0 path is available to everyone. The following
+users, however, MUST obtain a signed Commercial License from Dynet BEFORE any
+use, internal use, modification, distribution, or hosting of the Software
+(each a "Qualifying Commercial Use"):
+
+  (a) any commercial entity (including nonprofit organizations, government
+      agencies, and instrumentalities thereof) with annual revenue, funding,
+      or budget exceeding USD $5,000,000 in its most recent fiscal year, or
+      any entity controlled by, controlling, or under common control with
+      such an entity (thresholds apply to the combined group);
+
+  (b) any individual with a personal net worth exceeding USD $5,000,000;
+
+  (c) any party offering the Software, in whole or in part, or any derivative
+      work thereof, as a hosted service, SaaS, PaaS, IaaS, API, or any other
+      form of remote network offering to third parties, whether or not for a
+      fee, regardless of whether the Software is distributed to those third
+      parties; and
+
+  (d) any other party notified in writing by Dynet that a Commercial License
+      is required for its use, including any party whose use of the Software
+      is, in Dynet's good-faith determination, materially adverse to the
+      public interest or to the user community this Software is intended to
+      serve.
+
+For the avoidance of doubt: entities and individuals below the thresholds in
+(a) and (b) who do not engage in the activities in (c) or (d) may use the
+Software freely under GPL-3.0 without any fee or notice to Dynet.
+
+Commercial License terms, including applicable fees, are available from Dynet
+upon request and are not published in this repository. Nothing in this
+Section applies to use that is independently and fully licensed under GPL-3.0
+in accordance with Section 1; where GPL-3.0 rights are exercised, this Section
+does not narrow those rights, and Qualifying Commercial Users who instead take
+the Commercial License path are bound by its terms.
+
+================================================================================
+SECTION 4: INSTALLATION REGISTRATION AND UPDATES
+================================================================================
+
+The installation process of this Software performs a registration transmission
+to a Licensor-operated endpoint upon acceptance of this LICENSE, and may
+thereafter perform periodic version-check and update transmissions. These
+transmissions include the hostname, machine identifier, operating system,
+Software version, and date/time of installation, and are used for license
+administration, version tracking, and Software improvement. They may be
+disabled after installation via the configuration documented in the
+installation script. Any such transmission is made in the ordinary course of
+installation and support of the Software and does not grant the Licensor any
+additional rights over user data, which remains the property of its owner.
+
+================================================================================
+SECTION 5: CONTRIBUTIONS
+================================================================================
+
+Contributions to this project are welcome and encouraged. By submitting a
+contribution, you agree to license it under GPL-3.0 and to grant the Licensor
+a perpetual, worldwide, non-exclusive, royalty-free right to sublicense your
+contribution under any license (including the Commercial License), as further
+described in CONTRIBUTING.md. You warrant that you have the right to grant
+these licenses.
+
+================================================================================
+SECTION 6: TRADEMARKS AND IDENTITY
+================================================================================
+
+"Dynet", "LOS", and the LOS mark are names and marks used by the Licensor.
+This LICENSE grants no right to use them as trademarks, brands, product names,
+or trade identities in connection with any distribution or service without
+prior written permission. Modified versions must not use the names "Dynet" or
+"LOS" in a way that reasonably suggests endorsement by or affiliation with the
+Licensor, except as permitted by GPL-3.0 regarding honest statements of
+origin.
+
+================================================================================
+SECTION 7: ENFORCEMENT AND LEGAL RECOURSE
+================================================================================
+
+Any use of the Software outside the express grants of this LICENSE or of a
+signed Commercial License is unauthorized, constitutes copyright infringement
+and/or breach of contract, and voids the license grant for that user. The
+Licensor reserves all rights and remedies available at law or in equity,
+including injunctive relief and monetary damages.
+
+Independent development of similar functionality is not claimed by this
+LICENSE, which covers only the Software and its derivatives as defined by
+GPL-3.0. This LICENSE is governed by the laws of the jurisdiction of the
+Licensor's principal place of business, without regard to conflict-of-law
+principles.
+
+================================================================================
+SECTION 8: CONTACT
+================================================================================
+
+Commercial licensing and other inquiries: contact Dynet: charlton@dynet.com
+
+                                     (C)2025-2026 Charlton Harrison d/b/a Dynet
+                                     All Rights Reserved.

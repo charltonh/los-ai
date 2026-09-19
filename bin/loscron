@@ -1,0 +1,102 @@
+#!/bin/bash
+# loscron - LOS Cron Daemon manager
+#
+# Usage:
+#   loscron start    Start the daemon
+#   loscron stop     Stop the daemon
+#   loscron restart  Restart the daemon
+#   loscron status   Check daemon status
+#   loscron once     Run a single check and exit
+#   loscron log      Tail the log file
+
+LOSCRON_DIR="/los/sys/loscron"
+LOSCRON_PY="$LOSCRON_DIR/loscron.py"
+PID_FILE="$LOSCRON_DIR/loscron.pid"
+LOG_FILE="$LOSCRON_DIR/loscron.log"
+PYTHON="/usr/bin/python3"
+
+get_pid() {
+    if [ -f "$PID_FILE" ]; then
+        cat "$PID_FILE"
+    fi
+}
+
+is_running() {
+    local pid=$(get_pid)
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        return 0
+    fi
+    return 1
+}
+
+case "${1:-}" in
+    start)
+        if is_running; then
+            echo "loscron is already running (pid=$(get_pid))"
+            exit 1
+        fi
+        echo "Starting loscron..."
+        nohup "$PYTHON" "$LOSCRON_PY" >> "$LOG_FILE" 2>&1 &
+        echo "loscron started (pid=$!)"
+        ;;
+
+    stop)
+        if ! is_running; then
+            echo "loscron is not running"
+            # Clean up stale PID file
+            rm -f "$PID_FILE"
+            exit 0
+        fi
+        local_pid=$(get_pid)
+        echo "Stopping loscron (pid=$local_pid)..."
+        kill "$local_pid"
+        # Wait up to 10 seconds for graceful shutdown
+        for i in $(seq 1 10); do
+            if ! is_running; then
+                echo "loscron stopped"
+                exit 0
+            fi
+            sleep 1
+        done
+        echo "Force killing loscron..."
+        kill -9 "$local_pid" 2>/dev/null
+        rm -f "$PID_FILE"
+        echo "loscron killed"
+        ;;
+
+    restart)
+        $0 stop
+        sleep 1
+        $0 start
+        ;;
+
+    status)
+        if is_running; then
+            echo "loscron is running (pid=$(get_pid))"
+        else
+            echo "loscron is not running"
+            # Clean up stale PID file if exists
+            if [ -f "$PID_FILE" ]; then
+                rm -f "$PID_FILE"
+            fi
+        fi
+        ;;
+
+    once)
+        echo "Running single loscron check..."
+        "$PYTHON" "$LOSCRON_PY" --once --verbose
+        ;;
+
+    log)
+        if [ -f "$LOG_FILE" ]; then
+            tail -f "$LOG_FILE"
+        else
+            echo "No log file found at $LOG_FILE"
+        fi
+        ;;
+
+    *)
+        echo "Usage: loscron {start|stop|restart|status|once|log}"
+        exit 1
+        ;;
+esac

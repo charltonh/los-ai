@@ -1,0 +1,61 @@
+# Starting up LOS
+#
+# Everything below is now handled by a single command:
+#
+#     los gateway
+#
+# It starts the memory server, the action MCP server, any enabled
+# channels, the cron daemon and the web app — in dependency order, with
+# health checks and automatic restarts — and stops them all cleanly on
+# Ctrl-C.
+#
+#     los status          what is running
+#     los logs -f         follow every log
+#     los config          change ports, channels, users
+#     los doctor          check the installation
+#
+# The old manual sequence is kept here for reference and for debugging a
+# single service in isolation.  Each one still honours its historical
+# defaults when started by hand.
+
+
+# --- Reference: starting services individually -------------------------
+
+# Ollama (external; not managed by the gateway by default):
+ollama serve
+
+# Cron daemon:
+cd /los/sys/loscron
+python loscron.py
+
+# Web app:
+cd /los/sys
+source ssl_venv/bin/activate
+cd ssl_server
+python app.py
+
+# Memory MCP server:
+python /los/sys/memory_mcp/memory_server.py
+
+# Action MCP server:
+python /los/sys/aicall_mcp/action_server.py
+
+# WhatsApp channel (optional):
+cd /los/sys/whatsapp_mcp
+source whatsapp_venv/bin/activate
+python whatsapp_server.py
+
+# To start the WhatsApp channel with a visible browser (to scan the QR code):
+#   los config    -> Channels -> WhatsApp -> headless: no
+# or, by hand:
+#WHATSAPP_HEADLESS=0 python whatsapp_server.py
+
+
+# --- External agents ---------------------------------------------------
+
+# Kick off openclaw:
+openclaw gateway
+
+# Kick off hermes:
+hermes dashboard
+

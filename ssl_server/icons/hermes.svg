@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img">
+  <title>Hermes</title>
+  <defs>
+    <linearGradient id="hm-helmet" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffb84d"/>
+      <stop offset="100%" stop-color="#cc7700"/>
+    </linearGradient>
+    <linearGradient id="hm-wing" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffe6b3"/>
+      <stop offset="100%" stop-color="#ffaa33"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Left wing -->
+  <path d="M 28 24 C 18 18 10 16 6 20 C 4 22 6 26 12 28 C 18 30 24 28 28 26 Z" fill="url(#hm-wing)"/>
+  <path d="M 28 28 C 20 26 12 26 8 30 C 6 32 8 36 14 36 C 20 36 26 32 28 30 Z" fill="url(#hm-wing)"/>
+
+  <!-- Right wing -->
+  <path d="M 36 24 C 46 18 54 16 58 20 C 60 22 58 26 52 28 C 46 30 40 28 36 26 Z" fill="url(#hm-wing)"/>
+  <path d="M 36 28 C 44 26 52 26 56 30 C 58 32 56 36 50 36 C 44 36 38 32 36 30 Z" fill="url(#hm-wing)"/>
+
+  <!-- Helmet dome -->
+  <path d="M 18 34 C 18 24 26 18 32 18 C 38 18 46 24 46 34 C 46 44 40 52 32 52 C 24 52 18 44 18 34 Z" fill="url(#hm-helmet)"/>
+
+  <!-- Visor / face opening -->
+  <ellipse cx="32" cy="36" rx="10" ry="8" fill="#553300"/>
+  <ellipse cx="32" cy="34" rx="10" ry="8" fill="#ffddaa"/>
+
+  <!-- Helmet crest -->
+  <path d="M 28 18 L 32 8 L 36 18 Z" fill="#cc7700"/>
+  <circle cx="32" cy="8" r="3" fill="#ffcc66"/>
+
+  <!-- Decorative H stripe -->
+  <path d="M 26 38 L 38 38" stroke="#cc7700" stroke-width="3" stroke-linecap="round"/>
+  <path d="M 26 42 L 38 42" stroke="#cc7700" stroke-width="3" stroke-linecap="round"/>
+</svg>

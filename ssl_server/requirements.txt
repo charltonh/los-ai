@@ -1,0 +1,5 @@
+# LOS web app (ssl_server) — Python dependencies
+# Installed into /los/sys/ssl_venv by `los install`.
+Flask>=3.1.0
+Werkzeug>=3.1.0
+requests>=2.32.0

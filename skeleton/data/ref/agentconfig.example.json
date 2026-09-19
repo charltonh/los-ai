@@ -1,0 +1,31 @@
+{
+  "_comment": "Example agent configuration file for OpenClaw or similar agents.",
+  "_comment2": "Place this file in your user directory (e.g., ~/.openclaw.json) and reference it from .config",
+  
+  "type": "agent",
+  "provider": "openclaw",
+  "icon": "🦞",
+
+  "gateway_url": "ws://127.0.0.1:18789",
+
+  "llms": [
+    {
+      "api_url": "ws://127.0.0.1:18789",
+      "model": "openrouter/qwen/qwen3.5-plus-02-15",
+      "timeout": 600,
+      "context_window": 131072
+    }
+  ],
+
+  "_config_note": [
+    "To register this agent in your .config file, add a section like:",
+    "",
+    "openclaw:",
+    "  aiconfig = \".openclaw.json\"",
+    "  type = agent",
+    "",
+    "The 'type = agent' in .config is optional if 'type' is set in the aiconfig JSON.",
+    "The 'icon' field can be an emoji or a FontAwesome class like 'fas fa-robot'.",
+    "The 'gateway_url' is used if the agent uses WebSocket/webhook communication."
+  ]
+}

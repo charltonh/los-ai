@@ -1,0 +1,7 @@
+# LOS core services — Python dependencies
+#
+# These are needed by the action MCP server, the memory MCP server and
+# aicall, which all run on the system python3.  The `los` command itself
+# is deliberately stdlib-only so it can bootstrap before any venv exists.
+Flask>=3.1.0
+requests>=2.32.0

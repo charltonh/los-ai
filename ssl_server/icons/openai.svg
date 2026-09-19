@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img">
+  <title>OpenAI</title>
+  <defs>
+    <linearGradient id="oai-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10a37f"/>
+      <stop offset="100%" stop-color="#065f46"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#oai-bg)"/>
+  <path d="M 32 10 C 22 10 14 18 14 28 C 14 32 15.5 36 18 39 L 14 50 L 25 46 C 27.5 47.5 30 48 32 48 C 42 48 50 40 50 30 C 50 20 42 12 32 10 Z" fill="rgba(255,255,255,0.12)"/>
+  <path d="M 32 16 L 36 24 L 44 24 L 38 30 L 40 38 L 32 33 L 24 38 L 26 30 L 20 24 L 28 24 Z" fill="rgba(255,255,255,0.9)" stroke="none"/>
+</svg>

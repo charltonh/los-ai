@@ -1,0 +1,10 @@
+# LOS WhatsApp channel (whatsapp_mcp) — Python dependencies
+# Installed into /los/sys/whatsapp_mcp/whatsapp_venv by `los install`
+# when the WhatsApp channel is enabled.
+Flask>=3.1.0
+requests>=2.32.0
+selenium>=4.40.0
+webdriver-manager>=4.0.0
+pillow>=12.0.0
+python-dotenv>=1.2.0
+websocket-client>=1.9.0

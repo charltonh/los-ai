@@ -1,0 +1,2 @@
+# Custom cron entries - one JSON object per line
+# Format: {"id":"...","type":"date|cron|cycle","title":"...","description":"...","enabled":true,"action":"display|execute|notify","command":null,"month":null,"day":null,"year":null,"expression":null,"schedule":null,"interval":null,"anchor":null,"last_run":null,"created_at":"..."}

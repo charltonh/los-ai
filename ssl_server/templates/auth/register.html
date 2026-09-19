@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Productivity Dashboard</title>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/auth.css">
+    
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <style>
+        /* Basic styling specific to the registration page */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: var(--bg-color);
+            padding: 2rem 0;
+        }
+        
+        .register-container {
+            background-color: var(--window-bg);
+            border-radius: 8px;
+            box-shadow: 0 2px 10px var(--shadow-color);
+            padding: 2rem;
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        .register-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .register-header h1 {
+            color: var(--primary-color);
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-color);
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+        }
+        
+        .form-group .hint {
+            font-size: 0.8rem;
+            color: var(--text-color);
+            opacity: 0.7;
+            margin-top: 0.3rem;
+        }
+        
+        .form-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .register-btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            transition: opacity 0.3s;
+        }
+        
+        .register-btn:hover {
+            opacity: 0.9;
+        }
+        
+        .login-link {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+        
+        .login-link:hover {
+            text-decoration: underline;
+        }
+        
+        .error-message {
+            background-color: rgba(236, 76, 71, 0.1);
+            color: var(--danger-color);
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .password-requirements {
+            background-color: var(--hover-bg);
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+        }
+        
+        .password-requirements ul {
+            margin: 0.5rem 0 0 1.5rem;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="register-container">
+        <div class="register-header">
+            <h1><i class="fas fa-calendar-alt"></i> Productivity Dashboard</h1>
+            <p>Create a new account</p>
+        </div>
+        
+        {% if error %}
+        <div class="error-message">
+            {{ error }}
+        </div>
+        {% endif %}
+        
+        <form action="/register" method="POST">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required pattern="[a-z][a-z0-9_-]{2,29}" title="Username must start with a letter and can contain only lowercase letters, numbers, hyphens, and underscores (3-30 characters)">
+                <div class="hint">Username will be used to create your Linux system account.</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="full_name">Full Name</label>
+                <input type="text" id="full_name" name="full_name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required minlength="8">
+                <div class="password-requirements">
+                    Password requirements:
+                    <ul>
+                        <li>At least 8 characters</li>
+                        <li>Include uppercase and lowercase letters</li>
+                        <li>Include at least one number</li>
+                        <li>Include at least one special character</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="confirm_password">Confirm Password</label>
+                <input type="password" id="confirm_password" name="confirm_password" required minlength="8">
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="register-btn">Register</button>
+                <a href="/login" class="login-link">Already have an account?</a>
+            </div>
+        </form>
+    </div>
+    
+    <script>
+        // Simple password match validation
+        const passwordField = document.getElementById('password');
+        const confirmField = document.getElementById('confirm_password');
+        const form = document.querySelector('form');
+        
+        form.addEventListener('submit', function(e) {
+            if (passwordField.value !== confirmField.value) {
+                e.preventDefault();
+                alert('Passwords do not match!');
+                confirmField.focus();
+            }
+        });
+    </script>
+</body>
+</html>

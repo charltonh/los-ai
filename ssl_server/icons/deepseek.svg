@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img">
+  <title>DeepSeek</title>
+  <defs>
+    <linearGradient id="ds-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a6bff"/>
+      <stop offset="100%" stop-color="#0033aa"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#ds-bg)"/>
+  <circle cx="24" cy="30" r="8" fill="none" stroke="#7ddcfc" stroke-width="3"/>
+  <circle cx="24" cy="30" r="2.5" fill="#7ddcfc"/>
+  <path d="M 24 22 C 30 22 34 26 34 30" stroke="#7ddcfc" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <circle cx="42" cy="30" r="6" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2.5"/>
+  <circle cx="42" cy="30" r="2" fill="rgba(255,255,255,0.8)"/>
+  <path d="M 42 24 C 46 24 48 27 48 30" stroke="rgba(255,255,255,0.6)" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M 20 43 C 24 47 40 47 44 43" stroke="rgba(255,255,255,0.5)" stroke-width="2" fill="none" stroke-linecap="round"/>
+</svg>

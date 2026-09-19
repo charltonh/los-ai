@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img">
+  <title>Qwen</title>
+  <defs>
+    <linearGradient id="qw-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b3ff8"/>
+      <stop offset="100%" stop-color="#3a0ca3"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#qw-bg)"/>
+  <circle cx="30" cy="29" r="14" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="5"/>
+  <line x1="39.5" y1="38.5" x2="51" y2="51" stroke="rgba(255,255,255,0.9)" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="30" cy="29" r="5" fill="rgba(255,255,255,0.2)"/>
+</svg>

@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+"""los — run and manage a LOS installation.
+
+A thin shim so `los` works from anywhere on $PATH; all of the logic lives
+in the stdlib-only `los` package next to this file.
+"""
+
+import os
+import sys
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_SYS = os.path.dirname(_HERE)          # /los/sys
+
+if _SYS not in sys.path:
+    sys.path.insert(0, _SYS)
+
+try:
+    from los.__main__ import main
+except ImportError as exc:                                  # pragma: no cover
+    sys.stderr.write(
+        "los: cannot load the los package from %s (%s)\n" % (_SYS, exc))
+    sys.exit(1)
+
+if __name__ == "__main__":
+    sys.exit(main())

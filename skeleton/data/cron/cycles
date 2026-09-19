@@ -1,0 +1,2 @@
+# Cycle-based entries - one JSON object per line
+# Example: {"id":"cycle_001","type":"cycle","title":"Get water","description":"","enabled":true,"action":"display","command":null,"month":null,"day":null,"year":null,"expression":null,"schedule":null,"interval":{"days":7,"hours":0,"minutes":0},"anchor":"2026-01-01T08:00:00","last_run":null,"created_at":"2026-01-01T00:00:00"}

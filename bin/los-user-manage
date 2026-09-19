@@ -1,0 +1,210 @@
+#!/usr/bin/env python3
+"""
+LOS User Management CLI tool
+
+This script provides command-line tools for creating and managing users
+in the LOS system. This tool only manages the LOS authentication system
+without modifying Linux system users.
+
+Usage:
+    ./los-user-manage create <username> [--fullname "Full Name"] [--email "email@example.com"]
+    ./los-user-manage passwd <username>
+    ./los-user-manage list
+    ./los-user-manage delete <username>
+    ./los-user-manage help
+
+Options:
+    create    Create a new LOS user account
+    passwd    Change password for an existing LOS user
+    list      List all LOS users in the system
+    delete    Delete a LOS user account
+    help      Show this help message
+"""
+
+import os
+import sys
+import getpass
+import argparse
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from auth import (
+    create_los_user, is_valid_username, 
+    hash_password, authenticate_user, list_users,
+    get_user_info, update_los_password, delete_los_user
+)
+
+def create_user(args):
+    """Create a new LOS user account"""
+    username = args.username
+    full_name = args.fullname or ""
+    email = args.email or ""
+    
+    # Validate username
+    if not is_valid_username(username):
+        print(f"Error: Invalid username '{username}'")
+        print("Username must start with a letter and contain only lowercase letters, numbers, hyphens, or underscores.")
+        print("Username must be between 3 and 30 characters long.")
+        return 1
+    
+    # Check if user already exists
+    user_info = get_user_info(username)
+    if user_info:
+        print(f"Error: LOS user '{username}' already exists.")
+        return 1
+    
+    # Get password (with confirmation)
+    password = getpass.getpass("Enter password for new LOS user: ")
+    confirm_password = getpass.getpass("Confirm password: ")
+    
+    if password != confirm_password:
+        print("Error: Passwords do not match")
+        return 1
+    
+    if len(password) < 8:
+        print("Error: Password must be at least 8 characters long")
+        return 1
+    
+    # Create the user
+    print(f"Creating LOS user '{username}'...")
+    success = create_los_user(username, password, full_name, email)
+    
+    if success:
+        print(f"LOS user '{username}' created successfully")
+        return 0
+    else:
+        print(f"Error: Failed to create LOS user '{username}'")
+        return 1
+
+def change_password(args):
+    """Change password for an existing LOS user"""
+    username = args.username
+    
+    # Check if user exists
+    user_info = get_user_info(username)
+    if not user_info:
+        print(f"Error: LOS user '{username}' does not exist")
+        return 1
+    
+    # Get current password for verification (only if not running as root)
+    if os.geteuid() != 0:
+        current_password = getpass.getpass("Enter current LOS password: ")
+        if not authenticate_user(username, current_password):
+            print("Error: Current password is incorrect")
+            return 1
+    
+    # Get new password
+    new_password = getpass.getpass("Enter new LOS password: ")
+    confirm_password = getpass.getpass("Confirm new LOS password: ")
+    
+    if new_password != confirm_password:
+        print("Error: Passwords do not match")
+        return 1
+    
+    if len(new_password) < 8:
+        print("Error: Password must be at least 8 characters long")
+        return 1
+    
+    # Update the LOS password
+    if update_los_password(username, new_password):
+        print(f"LOS password changed successfully for user '{username}'")
+        return 0
+    else:
+        print(f"Error: Failed to change LOS password for user '{username}'")
+        return 1
+
+def list_all_users(args):
+    """List all LOS users in the system"""
+    users = list_users()
+    
+    if not users:
+        print("No LOS users found")
+        return 0
+    
+    print(f"Found {len(users)} LOS users:")
+    for username in sorted(users):
+        user_info = get_user_info(username)
+        if user_info:
+            full_name = user_info.get('full_name', '')
+            email = user_info.get('email', '')
+            created_at = user_info.get('created_at', 'Unknown')
+            
+            if full_name and email:
+                print(f"  {username} - {full_name} <{email}> (created: {created_at})")
+            elif full_name:
+                print(f"  {username} - {full_name} (created: {created_at})")
+            elif email:
+                print(f"  {username} - <{email}> (created: {created_at})")
+            else:
+                print(f"  {username} (created: {created_at})")
+        else:
+            print(f"  {username}")
+    
+    return 0
+
+def delete_user(args):
+    """Delete a LOS user account"""
+    username = args.username
+    
+    # Check if user exists
+    user_info = get_user_info(username)
+    if not user_info:
+        print(f"Error: LOS user '{username}' does not exist")
+        return 1
+    
+    # Get confirmation
+    confirm = input(f"Are you sure you want to delete LOS user '{username}'? This action cannot be undone. [y/N] ")
+    if confirm.lower() != 'y':
+        print("LOS user deletion cancelled")
+        return 0
+    
+    # Delete LOS user
+    if delete_los_user(username):
+        print(f"LOS user '{username}' deleted successfully")
+        return 0
+    else:
+        print(f"Error: Failed to delete LOS user '{username}'")
+        return 1
+
+def main():
+    # Create main parser
+    parser = argparse.ArgumentParser(description='LOS User Management CLI tool')
+    subparsers = parser.add_subparsers(dest='command', help='Command to execute')
+    
+    # Create parser for 'create' command
+    create_parser = subparsers.add_parser('create', help='Create a new LOS user account')
+    create_parser.add_argument('username', help='Username for the new account')
+    create_parser.add_argument('--fullname', help='Full name of the user')
+    create_parser.add_argument('--email', help='Email address of the user')
+    
+    # Create parser for 'passwd' command
+    passwd_parser = subparsers.add_parser('passwd', help='Change password for an existing LOS user')
+    passwd_parser.add_argument('username', help='Username of the account')
+    
+    # Create parser for 'list' command
+    list_parser = subparsers.add_parser('list', help='List all LOS users in the system')
+    
+    # Create parser for 'delete' command
+    delete_parser = subparsers.add_parser('delete', help='Delete a LOS user account')
+    delete_parser.add_argument('username', help='Username of the account to delete')
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    # Run appropriate command
+    if args.command == 'create':
+        return create_user(args)
+    elif args.command == 'passwd':
+        return change_password(args)
+    elif args.command == 'list':
+        return list_all_users(args)
+    elif args.command == 'delete':
+        return delete_user(args)
+    else:
+        # Show help message
+        parser.print_help()
+        return 0
+
+if __name__ == '__main__':
+    sys.exit(main())

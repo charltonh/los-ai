@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LOS Dashboard</title>
+    
+    <!-- FullCalendar CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+    <!-- Google Fonts (UI font choices) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto:wght@400;500;700&family=Open+Sans:wght@400;600&family=Ubuntu:wght@400;500&family=Lato:wght@400;700&family=Nunito:wght@400;600&family=Source+Code+Pro:wght@400;600&family=JetBrains+Mono:wght@400;600&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <!-- Left side: LOS Dashboard dropdown with system info -->
+            <div class="dashboard-dropdown">
+                <button class="dashboard-dropdown-btn">
+                    <i class="fas fa-th-large"></i> LOS Dashboard
+                </button>
+                <div class="dashboard-dropdown-content">
+                    <div class="system-info">
+                        <p><span id="resolution-display">Resolution: Detecting...</span></p>
+                        <p>Server port: 14001</p>
+                        <p>SSL Enabled: Yes (Self-signed)</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Center: Date and Time -->
+            <div class="header-datetime">
+                <span id="current-datetime">Loading date and time...</span>
+            </div>
+            
+            <!-- Right side: Settings and User dropdowns -->
+            <div class="header-right">
+                <!-- Settings dropdown with Gear Icon -->
+                <div class="settings-dropdown">
+                    <button class="settings-dropdown-btn">
+                        <i class="fas fa-cog"></i> Settings
+                    </button>
+                    <div class="settings-dropdown-content">
+                        <div class="settings-section-dropdown">
+                            <h4><i class="fas fa-palette"></i> Appearance</h4>
+                            <div class="appearance-controls">
+                            <div class="theme-selector">
+                                <label for="theme-select-dropdown">Theme:</label>
+                                <select id="theme-select-dropdown">
+                                    <optgroup label="── Classic ──">
+                                        <option value="light">Light</option>
+                                        <option value="dark">Dark</option>
+                                        <option value="system">System Default</option>
+                                    </optgroup>
+                                    <optgroup label="── Dark + Colour ──">
+                                        <option value="dark-green">Dark + Green</option>
+                                        <option value="dark-red">Dark + Red</option>
+                                        <option value="dark-white">Dark + White</option>
+                                    </optgroup>
+                                    <optgroup label="── Developer ──">
+                                        <option value="dracula">Dracula</option>
+                                        <option value="monokai">Monokai</option>
+                                        <option value="solarized-dark">Solarized Dark</option>
+                                        <option value="nord">Nord</option>
+                                        <option value="gruvbox">Gruvbox</option>
+                                    </optgroup>
+                                    <optgroup label="── Atmospheric ──">
+                                        <option value="midnight-blue">Midnight Blue</option>
+                                        <option value="ocean">Ocean</option>
+                                        <option value="forest">Forest</option>
+                                        <option value="sunset">Sunset</option>
+                                    </optgroup>
+                                    <optgroup label="── Terminal ──">
+                                        <option value="amber-terminal">Amber Terminal</option>
+                                        <option value="cyberpunk">Cyberpunk</option>
+                                        <option value="high-contrast">High Contrast</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                            <div class="theme-selector">
+                                <label for="font-family-select">Font:</label>
+                                <select id="font-family-select">
+                                    <optgroup label="── Sans-serif ──">
+                                        <option value="segoe">Segoe UI (default)</option>
+                                        <option value="system-ui">System UI</option>
+                                        <option value="inter">Inter</option>
+                                        <option value="roboto">Roboto</option>
+                                        <option value="open-sans">Open Sans</option>
+                                        <option value="lato">Lato</option>
+                                        <option value="nunito">Nunito</option>
+                                        <option value="ubuntu">Ubuntu</option>
+                                    </optgroup>
+                                    <optgroup label="── Monospace ──">
+                                        <option value="source-code-pro">Source Code Pro</option>
+                                        <option value="jetbrains-mono">JetBrains Mono</option>
+                                    </optgroup>
+                                    <optgroup label="── Serif ──">
+                                        <option value="georgia">Georgia</option>
+                                        <option value="merriweather">Merriweather</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                            <div class="theme-selector">
+                                <label for="font-size-select">Size:</label>
+                                <select id="font-size-select">
+                                    <option value="12">XS (12px)</option>
+                                    <option value="13">Small (13px)</option>
+                                    <option value="14">Normal (14px)</option>
+                                    <option value="16">Medium (16px)</option>
+                                    <option value="18">Large (18px)</option>
+                                    <option value="20">XL (20px)</option>
+                                </select>
+                            </div>
+                            </div><!-- /appearance-controls -->
+                        </div><!-- /settings-section-dropdown appearance -->
+                        <div class="settings-section-dropdown">
+                            <h4><i class="fas fa-database"></i> Data Management</h4>
+                            <button id="export-data-dropdown" class="action-btn-small"><i class="fas fa-download"></i> Export Data</button>
+                            <button id="import-data-dropdown" class="action-btn-small"><i class="fas fa-upload"></i> Import Data</button>
+                            <input type="file" id="import-file-dropdown" accept=".json" style="display: none;">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Layout toggle: swap between main view and canvas -->
+                <div class="canvas-toggle-dropdown">
+                    <button class="canvas-toggle-btn" id="canvas-toggle-btn" title="Toggle between main view and canvas">
+                        <i class="fas fa-columns"></i>
+                    </button>
+                </div>
+
+                <!-- Notifications bell -->
+                <div class="notif-dropdown" id="notif-dropdown">
+                    <button class="notif-btn" id="notif-btn" title="Notifications">
+                        <i class="fas fa-bell"></i>
+                        <span class="notif-badge" id="notif-badge" style="display:none">0</span>
+                    </button>
+                    <div class="notif-panel" id="notif-panel" style="display:none">
+                        <div class="notif-panel-header">
+                            <span><i class="fas fa-bell"></i> Notifications</span>
+                            <button id="notif-mark-all" class="notif-mark-all-btn">Mark all read</button>
+                        </div>
+                        <div id="notif-list" class="notif-list">
+                            <div class="notif-empty">No notifications</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User dropdown -->
+                <div class="user-dropdown">
+                    <button class="user-dropdown-btn">
+                        <i class="fas fa-user-circle"></i> {{ session.username }}
+                    </button>
+                    <div class="user-dropdown-content">
+                        <a href="/logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Agenda Sidebar -->
+        <aside id="agenda-sidebar" class="sidebar hidden">
+            <div class="sidebar-header">
+                <!-- Title remains here, but toggle button is removed -->
+                <h2 id="agenda-title">{{ agenda_title }}</h2>
+            </div>
+            <div id="agenda-tree" class="sidebar-content">
+                <!-- Directory tree will be loaded here -->
+            </div>
+            <div class="sidebar-footer">
+                <button id="add-subentity-btn" class="action-btn">
+                    <i class="fas fa-plus-circle"></i> Add Sub-entity
+                </button>
+            </div>
+        </aside>
+        <!-- Button to toggle sidebar visibility (placed in header or elsewhere as needed) -->
+        <!-- Example placement in header, adjust as necessary -->
+        
+        <main class="dashboard">
+            <!-- Window 1: Main View (was Features) with tabs -->
+            <section class="window" id="main-view-window"> <!-- Renamed ID for clarity -->
+                <div class="window-header">
+                    <!-- Add toggle button here and change title -->
+                    <div class="window-title-area">
+                         <button id="toggle-agenda-sidebar-btn" class="icon-btn header-icon-btn" title="Toggle Agenda View">
+                             <i class="fas fa-folder"></i>
+                         </button>
+                         <h2 id="main-view-title">Agenda - /los/{{ session.username }}</h2>
+                    </div>
+                    <div class="tab-navigation">
+                        <button class="tab-button active" data-tab="calendar-tab">Calendar</button>
+                        <button class="tab-button" data-tab="todo-tab">Todo List</button>
+                        <button class="tab-button" data-tab="crontab-tab">Crontab</button>
+                        <button id="global-refresh" class="icon-btn" title="Refresh Current Tab">
+                            <i class="fas fa-refresh"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="window-content">
+                    <!-- Calendar Tab Content -->
+                    <div class="tab-content active" id="calendar-tab">
+                        <div id="calendar"></div>
+                    </div>
+                    
+                    <!-- Todo List Tab Content -->
+                    <div class="tab-content" id="todo-tab">
+                        <div class="todo-container">
+                            <div class="todo-header">
+                                <form id="add-todo-form">
+                                    <input type="number" id="new-todo-priority" value="1.0" placeholder="Prio" min="0" max="9.9" step="0.1" style="width: 70px; margin-right: 5px;" title="Priority (0.0 - 9.9)">
+                                    <input type="text" id="new-todo" placeholder="Add a new task..." style="flex-grow: 1; margin-right: 5px;">
+                                    <button type="button" id="add-todo-btn" class="add-btn"><i class="fas fa-plus"></i></button>
+                                </form>
+                            </div>
+                            <!-- Removed todo-filters div -->
+                            <ul id="todo-list"></ul>
+                            <!-- Removed todo-stats div -->
+                        </div>
+                    </div>
+                    
+                    <!-- Crontab Editor Tab Content -->
+                    <div class="tab-content" id="crontab-tab">
+                        <div class="crontab-container">
+                            <!-- Entry Creator -->
+                            <div class="cron-entry-creator">
+                                <div class="cron-creator-row">
+                                    <div class="cron-field">
+                                        <label for="cron-type-select">Type</label>
+                                        <select id="cron-type-select">
+                                            <option value="date">📅 Date</option>
+                                            <option value="cycle">🔄 Cycle</option>
+                                            <option value="cron">⏰ Cron</option>
+                                        </select>
+                                    </div>
+                                    <div class="cron-field" style="flex:2">
+                                        <label for="cron-title">Title</label>
+                                        <input type="text" id="cron-title" placeholder="Entry title..." maxlength="100">
+                                    </div>
+                                    <div class="cron-field">
+                                        <label for="cron-action-select">Action</label>
+                                        <select id="cron-action-select">
+                                            <option value="display">Display</option>
+                                            <option value="execute">Execute</option>
+                                            <option value="notify">Notify</option>
+                                        </select>
+                                    </div>
+                                    <div class="cron-field">
+                                        <label for="cron-file-select">Save to</label>
+                                        <select id="cron-file-select">
+                                            <option value="cron">cron</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Date-specific fields -->
+                                <div class="cron-type-fields" id="cron-date-fields">
+                                    <div class="cron-creator-row">
+                                        <div class="cron-field">
+                                            <label for="cron-date-rule">Rule</label>
+                                            <select id="cron-date-rule">
+                                                <option value="">Fixed Date</option>
+                                                <option value="nth_weekday">Nth Weekday</option>
+                                                <option value="last_weekday">Last Weekday</option>
+                                                <option value="easter">Easter-relative</option>
+                                            </select>
+                                        </div>
+                                        <div class="cron-field" id="cron-month-field">
+                                            <label for="cron-month">Month</label>
+                                            <select id="cron-month">
+                                                <option value="1">January</option><option value="2">February</option>
+                                                <option value="3">March</option><option value="4">April</option>
+                                                <option value="5">May</option><option value="6">June</option>
+                                                <option value="7">July</option><option value="8">August</option>
+                                                <option value="9">September</option><option value="10">October</option>
+                                                <option value="11">November</option><option value="12">December</option>
+                                            </select>
+                                        </div>
+                                        <div class="cron-field" id="cron-day-field">
+                                            <label for="cron-day">Day</label>
+                                            <input type="number" id="cron-day" min="1" max="31" value="1">
+                                        </div>
+                                        <div class="cron-field" id="cron-nth-field" style="display:none">
+                                            <label for="cron-nth">Which</label>
+                                            <select id="cron-nth">
+                                                <option value="1">1st</option><option value="2">2nd</option>
+                                                <option value="3">3rd</option><option value="4">4th</option>
+                                                <option value="5">5th</option>
+                                            </select>
+                                        </div>
+                                        <div class="cron-field" id="cron-weekday-field" style="display:none">
+                                            <label for="cron-weekday">Weekday</label>
+                                            <select id="cron-weekday">
+                                                <option value="0">Monday</option><option value="1">Tuesday</option>
+                                                <option value="2">Wednesday</option><option value="3">Thursday</option>
+                                                <option value="4">Friday</option><option value="5">Saturday</option>
+                                                <option value="6">Sunday</option>
+                                            </select>
+                                        </div>
+                                        <div class="cron-field" id="cron-easter-offset-field" style="display:none">
+                                            <label for="cron-easter-offset">Days from Easter</label>
+                                            <input type="number" id="cron-easter-offset" value="0" min="-60" max="60">
+                                        </div>
+                                        <div class="cron-field">
+                                            <label for="cron-origin-year">Origin Year</label>
+                                            <input type="number" id="cron-origin-year" min="1900" max="2100" placeholder="Birth/start yr">
+                                        </div>
+                                        <div class="cron-field">
+                                            <label for="cron-year">Year (empty=every year)</label>
+                                            <input type="number" id="cron-year" min="2000" max="2100" placeholder="Every year">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Cycle-specific fields -->
+                                <div class="cron-type-fields" id="cron-cycle-fields" style="display:none">
+                                    <div class="cron-creator-row">
+                                        <div class="cron-field">
+                                            <label for="cron-interval-days">Days</label>
+                                            <input type="number" id="cron-interval-days" min="0" value="7">
+                                        </div>
+                                        <div class="cron-field">
+                                            <label for="cron-interval-hours">Hours</label>
+                                            <input type="number" id="cron-interval-hours" min="0" max="23" value="0">
+                                        </div>
+                                        <div class="cron-field">
+                                            <label for="cron-interval-minutes">Minutes</label>
+                                            <input type="number" id="cron-interval-minutes" min="0" max="59" value="0">
+                                        </div>
+                                        <div class="cron-field" style="flex:2">
+                                            <label for="cron-anchor">Anchor Date/Time</label>
+                                            <input type="datetime-local" id="cron-anchor">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Cron expression fields -->
+                                <div class="cron-type-fields" id="cron-expr-fields" style="display:none">
+                                    <div class="cron-creator-row">
+                                        <div class="cron-field"><label for="cron-min">Min</label><input type="text" id="cron-min" value="*" maxlength="10"></div>
+                                        <div class="cron-field"><label for="cron-hour">Hour</label><input type="text" id="cron-hour" value="*" maxlength="10"></div>
+                                        <div class="cron-field"><label for="cron-dom">DoM</label><input type="text" id="cron-dom" value="*" maxlength="10"></div>
+                                        <div class="cron-field"><label for="cron-mon">Mon</label><input type="text" id="cron-mon" value="*" maxlength="10"></div>
+                                        <div class="cron-field"><label for="cron-dow">DoW</label><input type="text" id="cron-dow" value="*" maxlength="10"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Command field (shown when action=execute) -->
+                                <div class="cron-creator-row" id="cron-command-row" style="display:none">
+                                    <div class="cron-field" style="flex:1">
+                                        <label for="cron-command">Command</label>
+                                        <input type="text" id="cron-command" placeholder="Command to execute..." maxlength="500">
+                                    </div>
+                                </div>
+
+                                <div class="cron-creator-row">
+                                    <div class="cron-field" style="flex:1">
+                                        <label for="cron-description">Description</label>
+                                        <input type="text" id="cron-description" placeholder="Optional description..." maxlength="200">
+                                    </div>
+                                    <button id="add-cron-entry" class="add-btn" style="align-self:flex-end;margin-bottom:2px"><i class="fas fa-plus"></i> Add Entry</button>
+                                </div>
+                            </div>
+
+                            <!-- File Tabs -->
+                            <div class="cron-file-tabs" id="cron-file-tabs">
+                                <button class="cron-file-tab active" data-file="all">All</button>
+                            </div>
+
+                            <!-- Entry List -->
+                            <div class="crontab-entries">
+                                <ul id="crontab-list"></ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Window 2: Split into Task Editor (top) and AI Window (bottom) -->
+            <div class="middle-column-split" id="middle-column-split">
+                <!-- Top Half: Task Editor -->
+                <section class="window" id="editor-window">
+                    <div class="window-header">
+                        <h2><i class="fas fa-edit"></i> Task Editor</h2>
+                        <span id="editor-title-path" class="editor-title-path"></span>
+                        <div class="editor-controls">
+                            <button id="save-task" class="editor-btn"><i class="fas fa-save"></i> Save</button>
+                            <button id="clear-editor" class="editor-btn"><i class="fas fa-trash"></i> Clear</button>
+                        </div>
+                    </div>
+                    <div class="window-content">
+                        <div class="editor-container">
+                            <div class="editor-info">
+                                <div class="editor-info-text">
+                                    <p>Selected task: <span id="selected-task-name">None</span> <span class="task-source-path" id="selected-task-path"></span></p>
+                                    <p>Last modified: <span id="selected-task-date">-</span></p>
+                                </div>
+                                <div class="editor-task-controls">
+                                    <div class="form-group" id="priority-field-container">
+                                        <label for="task-priority">Priority:</label>
+                                        <input type="number" id="task-priority" min="0" max="9.9" step="0.1" value="1.0" title="Priority (0.0 - 9.9, lower is higher priority)">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="task-status">Status:</label>
+                                        <select id="task-status">
+                                            <option value="new">New</option>
+                                            <option value="confirmed">Confirmed</option>
+                                            <option value="in_progress">In Progress</option>
+                                            <option value="delegated">Delegated</option>
+                                            <option value="blocked">Blocked</option>
+                                            <option value="tentative">Tentative</option>
+                                            <option value="cancelled">Cancelled</option>
+                                            <option value="archived">Archived</option>
+                                            <option value="done">Done</option>
+                                        </select>
+                                    </div>
+                                    <!-- DELEGATE BUTTON: commented out until functionality is complete
+                                    <button id="delegate-task-btn" class="editor-btn delegate-btn" title="Delegate Task">
+                                        <i class="fas fa-share-square"></i> Delegate
+                                    </button>
+                                    -->
+                                </div>
+                            </div>
+                            <div class="editor-main-section">
+                                <textarea id="task-editor" rows="3" placeholder="Select a task from Todo list or create a new one to edit its content here..."></textarea>
+                            </div>
+                            <hr class="editor-divider">
+                            <div class="notes-section">
+                                <label class="notes-label">Notes</label>
+                                <textarea id="task-notes" placeholder="Add notes here..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Bottom Half: AI Window -->
+                <section class="window" id="ai-window">
+                    <div class="window-header">
+                        <h2><i class="fas fa-brain"></i> AI :
+                            <span class="ai-select-wrapper">
+                                <!-- hidden native select kept as source-of-truth for existing JS -->
+                                <select id="ai-config-select" style="display:none"><option value="">Loading...</option></select>
+                                <!-- custom visual dropdown -->
+                                <div class="ai-custom-select" id="ai-custom-select">
+                                    <div class="ai-select-trigger" id="ai-select-trigger" tabindex="0" role="combobox" aria-haspopup="listbox">
+                                        <span class="ai-trigger-inner">
+                                            <span class="ai-trigger-icon-slot" id="ai-trigger-icon-slot"></span>
+                                            <span class="ai-trigger-label" id="ai-trigger-label">Loading…</span>
+                                        </span>
+                                        <i class="fas fa-chevron-down ai-chevron"></i>
+                                    </div>
+                                    <div class="ai-select-options" id="ai-select-options" role="listbox"></div>
+                                </div>
+                            </span>
+                            <!-- Context dropdown (no inline label — tooltip only) -->
+                            <span class="ai-select-wrapper ai-context-wrapper">
+                                <div class="ai-custom-select ai-context-select" id="ai-context-custom-select" title="Context">
+                                    <div class="ai-select-trigger ai-context-trigger" id="ai-context-trigger"
+                                         tabindex="0" role="combobox" aria-haspopup="listbox" title="Context">
+                                        <span class="ai-trigger-inner">
+                                            <span class="ai-trigger-label" id="ai-context-trigger-label">Task</span>
+                                        </span>
+                                        <i class="fas fa-chevron-down ai-chevron"></i>
+                                    </div>
+                                    <div class="ai-select-options ai-context-options" id="ai-context-options" role="listbox"></div>
+                                </div>
+                            </span>
+                            <span class="ai-entity-path" id="ai-entity-path"></span>
+                        </h2>
+
+                        <div class="ai-controls">
+                            <label class="ai-thinking-toggle" title="Show thinking/debug output from AI">
+                                <input type="checkbox" id="ai-show-thinking">
+                                <span class="ai-thinking-label">Thinking</span>
+                            </label>
+                            <button id="ai-clear-btn" class="editor-btn" title="Clear AI window"><i class="fas fa-eraser"></i> Clear</button>
+                            <button id="ai-send-btn" class="editor-btn" title="Send prompt to AI"><i class="fas fa-paper-plane"></i> Send</button>
+                        </div>
+                    </div>
+                    <div class="window-content">
+                        <div class="ai-container">
+                            <div class="ai-input-section">
+                                <textarea id="ai-prompt-input" rows="5" placeholder="Enter your prompt here..."></textarea>
+                            </div>
+                            <hr class="editor-divider">
+                            <div class="ai-output-section">
+                                <label class="ai-output-label"><i class="fas fa-robot"></i> Output</label>
+                                <div id="ai-output" class="ai-output-content">
+                                    <p class="ai-placeholder">AI response will appear here...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+            
+            <!-- Window 3: Canvas (for higher resolutions) -->
+            <section class="window" id="additional-window">
+                <div class="window-header">
+                    <span class="canvas-title" id="canvas-title"><i class="fas fa-file-alt"></i> Canvas</span>
+                    <div class="canvas-header-controls" style="visibility: hidden;">
+                        <button id="canvas-edit-btn" class="canvas-btn">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button id="canvas-save-btn" class="canvas-btn" style="display: none;">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <button id="canvas-cancel-btn" class="canvas-btn" style="display: none;">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>
+                    </div>
+                </div>
+                <div class="window-content">
+                    <div class="canvas-placeholder">
+                        <p><i class="fas fa-pencil-alt"></i> Canvas will be available here for viewing and editing text and documents.</p>
+                        <p class="canvas-note">This feature is coming soon.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+        
+    <div id="event-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Event Details</h2>
+            <form id="event-form">
+                <div class="form-group">
+                    <label for="event-title">Title</label>
+                    <input type="text" id="event-title" required>
+                </div>
+                <div class="form-group">
+                    <label for="event-start">Start</label>
+                    <input type="datetime-local" id="event-start" required>
+                </div>
+                <div class="form-group">
+                    <label for="event-end">End</label>
+                    <input type="datetime-local" id="event-end" required>
+                </div>
+                <div class="form-group">
+                    <label for="event-color">Color</label>
+                    <input type="color" id="event-color" value="#3788d8">
+                </div>
+                <div class="form-group">
+                    <label for="event-description">Description</label>
+                    <textarea id="event-description"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="save-btn">Save</button>
+                    <button type="button" class="delete-btn" id="delete-event">Delete</button>
+                    <button type="button" class="cancel-btn">Cancel</button>
+                </div>
+                <input type="hidden" id="event-id">
+            </form>
+        </div>
+    </div>
+
+    <!-- Sub-entity Creation Modal -->
+    <div id="subentity-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" id="close-subentity-modal">&times;</span>
+            <h2>Create New Sub-entity</h2>
+            <form id="subentity-form">
+                <input type="hidden" id="parent-entity-path">
+                <div class="form-group">
+                    <label for="subentity-name">Sub-entity Name (Directory Name)</label>
+                    <input type="text" id="subentity-name" required pattern="[a-zA-Z0-9_-]+" title="Use letters, numbers, underscores, hyphens only">
+                </div>
+                <div class="form-group">
+                    <label for="subentity-identity">Identity Description</label>
+                    <textarea id="subentity-identity" rows="8" cols="80" placeholder="Describe this entity..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="subentity-goals">Goals (Optional)</label>
+                    <textarea id="subentity-goals" rows="8" cols="80" placeholder="What are the goals for this entity?"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="subentity-omni">Rules/Guidelines (Optional)</label>
+                    <textarea id="subentity-omni" rows="8" cols="80" placeholder="Define any overarching rules or guidelines..."></textarea>
+                </div>
+                 <div class="form-group">
+                    <label for="subentity-weight">Importance Weight (Optional, Default: 100)</label>
+                    <input type="number" id="subentity-weight" value="100" min="0">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="save-btn">Create</button>
+                    <button type="button" class="cancel-btn" id="cancel-subentity-creation">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delegation Modals -->
+    <div id="delegate-modal" class="modal">
+        <div class="modal-content large">
+            <span class="close-modal" data-modal-id="delegate-modal">&times;</span>
+            <h2>Delegate Task To:</h2>
+            <div class="delegate-options-grid">
+                <button class="delegate-option" data-delegate-type="myself">
+                    <i class="fas fa-user"></i> Myself
+                </button>
+                <button class="delegate-option" data-delegate-type="person">
+                    <i class="fas fa-user-friends"></i> Other Person
+                </button>
+                <button class="delegate-option" data-delegate-type="company">
+                    <i class="fas fa-building"></i> Company/Team
+                </button>
+                <button class="delegate-option" data-delegate-type="llm">
+                    <i class="fas fa-brain"></i> LLM AI
+                </button>
+                <button class="delegate-option" data-delegate-type="agent">
+                    <i class="fas fa-robot"></i> Agent AI
+                </button>
+                <button class="delegate-option" data-delegate-type="crew" disabled>
+                    <i class="fas fa-users-cog"></i> Crew AI
+                </button>
+                <button class="delegate-option" data-delegate-type="computer">
+                    <i class="fas fa-laptop-code"></i> Classical Computer
+                </button>
+                <button class="delegate-option" data-delegate-type="quantum" disabled>
+                    <i class="fas fa-atom"></i> Quantum Computer
+                </button>
+            </div>
+            <div class="form-actions">
+                 <button type="button" class="cancel-btn" data-modal-id="delegate-modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="delegate-person-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" data-modal-id="delegate-person-modal">&times;</span>
+            <h2>Delegate to Person</h2>
+            <form id="delegate-person-form">
+                <div class="form-group">
+                    <label for="delegate-person-name">Name</label>
+                    <input type="text" id="delegate-person-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="delegate-person-contact">Contact (Phone/Email)</label>
+                    <input type="text" id="delegate-person-contact">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="save-btn">Confirm Delegation</button>
+                    <button type="button" class="cancel-btn" data-modal-id="delegate-person-modal">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="delegate-company-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" data-modal-id="delegate-company-modal">&times;</span>
+            <h2>Delegate to Company/Team</h2>
+            <form id="delegate-company-form">
+                <div class="form-group">
+                    <label for="delegate-company-name">Name</label>
+                    <input type="text" id="delegate-company-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="delegate-company-contact">Contact (Phone/Email)</label>
+                    <input type="text" id="delegate-company-contact">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="save-btn">Confirm Delegation</button>
+                    <button type="button" class="cancel-btn" data-modal-id="delegate-company-modal">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="delegate-llm-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" data-modal-id="delegate-llm-modal">&times;</span>
+            <h2>Delegate to LLM AI</h2>
+            <form id="delegate-llm-form">
+                <div class="form-group">
+                    <label for="delegate-llm-model">Model Name</label>
+                    <input type="text" id="delegate-llm-model" required>
+                </div>
+                <div class="form-group">
+                    <label for="delegate-llm-url">URL (Optional)</label>
+                    <input type="url" id="delegate-llm-url">
+                </div>
+                <div class="form-group">
+                    <label for="delegate-llm-key">API Key (Optional)</label>
+                    <input type="password" id="delegate-llm-key">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="save-btn">Confirm Delegation</button>
+                    <button type="button" class="cancel-btn" data-modal-id="delegate-llm-modal">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="delegate-agent-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" data-modal-id="delegate-agent-modal">&times;</span>
+            <h2>Delegate to Agent AI</h2>
+            <form id="delegate-agent-form">
+                <div class="form-group">
+                    <label for="delegate-agent-name">Agent Name</label>
+                    <input type="text" id="delegate-agent-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="delegate-agent-url">URL (Optional)</label>
+                    <input type="url" id="delegate-agent-url">
+                </div>
+                <div class="form-group">
+                    <label for="delegate-agent-key">API Key (Optional)</label>
+                    <input type="password" id="delegate-agent-key">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="save-btn">Confirm Delegation</button>
+                    <button type="button" class="cancel-btn" data-modal-id="delegate-agent-modal">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="delegate-computer-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" data-modal-id="delegate-computer-modal">&times;</span>
+            <h2>Delegate to Classical Computer</h2>
+            <form id="delegate-computer-form">
+                <div class="form-group">
+                    <label for="delegate-computer-script">Script/Software:</label>
+                    <textarea id="delegate-computer-script" rows="10" placeholder="Enter script content here...">#!/bin/bash
+</textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="save-btn">Confirm Delegation</button>
+                    <button type="button" class="cancel-btn" data-modal-id="delegate-computer-modal">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- End Delegation Modals -->
+
+    <!-- FullCalendar JS -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.js"></script>
+    
+    <!-- Custom JS -->
+    <script src="/static/js/main.js"></script>
+    <script src="/static/js/dropdowns.js"></script> <!-- Dropdown toggle functionality -->
+    <script src="/static/js/drag-transfer.js"></script> <!-- Drag-to-entity system -->
+    <script src="/static/js/agenda.js"></script> <!-- Added Agenda JS -->
+    <script src="/static/js/calendar.js"></script>
+    <!-- Moved todo.js script tag to the end -->
+    <script src="/static/js/crontab.js"></script>
+    <script src="/static/js/editor.js"></script>
+    <script src="/static/js/ai.js"></script> <!-- AI Window functionality -->
+    <script src="/static/js/canvas.js"></script> <!-- Canvas history viewer + streaming terminal -->
+    <script src="/static/js/todo.js"></script> <!-- Moved here -->
+    <script src="/static/js/notifications.js"></script>
+</body>
+</html>
