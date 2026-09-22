@@ -31,7 +31,13 @@ RUN_DIR = os.environ.get("LOS_RUN", os.path.join(SYS_DIR, "run"))
 LOG_DIR = os.environ.get("LOS_LOG", os.path.join(SYS_DIR, "log"))
 VAR_DIR = os.environ.get("LOS_VAR", os.path.join(SYS_DIR, "var"))
 BIN_DIR = os.path.join(SYS_DIR, "bin")
+
+# Templates.  `los install` and `los-user-manage create` copy them into a new
+# agenda: skeleton/ for every new entity, and newuser/ as well when the
+# *account* is created — a starter .config plus the ai/ directory of
+# aiconfigs, prompts and memory.  Sub-entities get skeleton/ only.
 SKELETON_DIR = os.path.join(SYS_DIR, "skeleton")
+NEWUSER_DIR = os.path.join(SYS_DIR, "newuser")
 
 # Runtime files
 GATEWAY_PID = os.path.join(RUN_DIR, "gateway.pid")

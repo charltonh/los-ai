@@ -13,6 +13,24 @@ from typing import Dict, Optional, Tuple, List
 ROOT_DIR = "/los"
 SALT_LENGTH = 16
 
+# Where the templates live, under /los/sys (see los/paths.py).
+#
+#   skeleton/   the *entity* skeleton — copied for every new entity,
+#               including a newly created user's root entity
+#   newuser/    starter files layered on top for a new root-level
+#               account only: a working .config, and the ai/ directory of
+#               aiconfigs, prompts and memory.  A sub-entity never gets
+#               these — its AI settings live in the labels of the parent
+#               account's .config.
+SKELETON_DIR = os.path.join(ROOT_DIR, "sys", "skeleton")
+NEWUSER_DIR = os.path.join(ROOT_DIR, "sys", "newuser")
+
+# The .config in the newuser template is a template rather than a file to
+# copy: every USER_PLACEHOLDER in it is replaced with the new username, so
+# the paths inside it point at that user's agenda.
+NEWUSER_CONFIG_TEMPLATE = os.path.join(NEWUSER_DIR, ".config")
+USER_PLACEHOLDER = "{user}"
+
 def is_valid_username(username: str) -> bool:
     """
     Validate a username format.
@@ -36,43 +54,82 @@ def verify_password(password: str, hashed_password: str, salt: str) -> bool:
     new_hash, _ = hash_password(password, salt)
     return new_hash == hashed_password
 
+def _copy_missing(source_root: str, target_root: str, exclude=None) -> None:
+    """Copy everything under source_root into target_root, never overwriting.
+
+    Missing directories are created, including empty ones — `ref/` and the
+    `data/` sub-directories have nothing in them, and git does not carry
+    empty directories, so they are only there because of the .gitkeep files
+    the skeleton keeps in them.
+
+    `exclude` is a set of absolute source paths to skip; the .config
+    template is one, because it is rendered rather than copied verbatim.
+    """
+    if not os.path.isdir(source_root):
+        return
+
+    for root, _dirs, files in os.walk(source_root):
+        rel_path = os.path.relpath(root, source_root)
+        target_dir = (target_root if rel_path == '.'
+                      else os.path.join(target_root, rel_path))
+        os.makedirs(target_dir, exist_ok=True)
+
+        for file in files:
+            source_file = os.path.join(root, file)
+            if exclude and source_file in exclude:
+                continue
+            target_file = os.path.join(target_dir, file)
+            if not os.path.exists(target_file):
+                shutil.copy2(source_file, target_file)
+
+
+def _write_user_config(username: str, user_home: str) -> None:
+    """Write the starter .config, with this user's paths substituted in.
+
+    The template under sys/newuser/ holds the paths already, so the copy
+    keeps working no matter where the agenda lives; only the username has to
+    be filled in.  An existing .config is never touched.
+    """
+    target = os.path.join(user_home, ".config")
+    if os.path.exists(target) or not os.path.isfile(NEWUSER_CONFIG_TEMPLATE):
+        return
+
+    try:
+        with open(NEWUSER_CONFIG_TEMPLATE, 'r', encoding='utf-8') as f:
+            body = f.read()
+        with open(target, 'w', encoding='utf-8') as f:
+            f.write(body.replace(USER_PLACEHOLDER, username))
+    except OSError as e:
+        print(f"Error writing starter .config: {e}")
+
+
 def create_user_directories(username: str) -> str:
-    """Create required directories for a new user using the skeleton template."""
+    """Create the home directory of a new root-level account.
+
+    The entity skeleton from sys/skeleton/ is copied in, exactly as for any
+    sub-entity, and then the starter files from sys/newuser/ are layered on
+    top: the .config and the ai/ directory that only an account has.  Every
+    sub-entity below it reads its AI settings from the labels in that
+    .config, so it gets neither.  Nothing already present is overwritten.
+    """
     user_home = os.path.join(ROOT_DIR, username)
-    skeleton_dir = os.path.join(ROOT_DIR, "sys", "skeleton")
-    
+
     # Create user home directory if it doesn't exist
     if not os.path.exists(user_home):
         os.makedirs(user_home, exist_ok=True)
-    
-    # Copy skeleton directory structure to user home
-    for root, dirs, files in os.walk(skeleton_dir):
-        # Calculate relative path from skeleton root
-        rel_path = os.path.relpath(root, skeleton_dir)
-        # Create corresponding directory in user home
-        if rel_path == '.':
-            # Skip the skeleton root itself
-            target_dir = user_home
-        else:
-            target_dir = os.path.join(user_home, rel_path)
-            
-        if not os.path.exists(target_dir):
-            os.makedirs(target_dir, exist_ok=True)
-        
-        # Copy files
-        for file in files:
-            source_file = os.path.join(root, file)
-            target_file = os.path.join(target_dir, file)
-            
-            if not os.path.exists(target_file):
-                shutil.copy2(source_file, target_file)
-    
+
+    # The entity skeleton first (this is what a sub-entity gets too), then the
+    # account-only starter files: .config and ai/.
+    _copy_missing(SKELETON_DIR, user_home)
+    _copy_missing(NEWUSER_DIR, user_home, exclude={NEWUSER_CONFIG_TEMPLATE})
+    _write_user_config(username, user_home)
+
     # Create entities file if not copied from skeleton
     entities_file = os.path.join(user_home, 'entities')
     if not os.path.exists(entities_file):
         with open(entities_file, 'w') as f:
             f.write("# Sub-entities for this entity\n# Format: one entity name per line\n")
-    
+
     return user_home
 
 def create_los_user(username: str, password: str, full_name: str = "", email: str = "") -> bool:

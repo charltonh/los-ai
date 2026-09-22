@@ -117,10 +117,6 @@ def defaults():
             "auto_check": True,
             "auto_apply": False,
         },
-        "reporting": {
-            "endpoint": "https://los.dynet.com/api/v1/report",
-            "interval": 86400,
-        },
     }
 
 
@@ -233,6 +229,13 @@ def migrate(data):
                 logging_cfg.setdefault("max_bytes", old_bytes)
             if old_keep is not None:
                 logging_cfg.setdefault("keep", old_keep)
+
+    # Reporting used to be a pair of config keys (reporting.endpoint and
+    # reporting.interval).  Both now live in los/report.py, so drop the
+    # block wherever it is found.  No schema bump: a bump would make an
+    # older release — the one `los update` rolls back to — refuse a config
+    # it wrote itself.
+    data.pop("reporting", None)
 
     data["schema_version"] = SCHEMA_VERSION
     return _merge(defaults(), data)

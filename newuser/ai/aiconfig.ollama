@@ -1,0 +1,23 @@
+{
+  "llms": [
+    {
+      "api_url": "http://127.0.0.1:11434/api/generate",
+      "api_key": null,
+      "timeout": 1500,
+      "model": "llama3.1:8b",
+      "options": {
+        "temperature": 0.7,
+        "max_tokens": 1800,
+        "n": 1,
+        "stop": null
+      }
+    }
+  ],
+
+  "_comment": [
+    "Ollama on this machine — no account and no API key.",
+    "Pull the model named above before using this label:  ollama pull llama3.1:8b",
+    "Any model you have pulled works; bigger models simply answer better.",
+    "LOS tries each entry in 'llms' in order, so extra models can be listed as fallbacks."
+  ]
+}

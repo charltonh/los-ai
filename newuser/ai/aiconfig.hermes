@@ -1,0 +1,23 @@
+{
+  "type": "agent",
+  "provider": "hermes",
+  "agent": "default",
+  "thinking": "high",
+  "timeout": 1800,
+  "gateway_url": "127.0.0.1:9119",
+  "bin": "hermes",
+  "icon": "🪽",
+
+  "_comment": [
+    "Hermes as an external agent: it does its own thinking, keeps its own",
+    "session memory and has its own tools, so LOS only hands it this agenda",
+    "and a list of MCP tools.",
+    "'bin' is the command LOS runs to reach Hermes. 'hermes' works when it is",
+    "on $PATH; otherwise give the absolute path, for example",
+    "/home/you/.local/bin/hermes.",
+    "'agent' names the profile/session to use (the label in .config can",
+    "override it with agent=<name>), and gateway_url is informational —",
+    "'hermes serve' listens on 127.0.0.1:9119 by default.",
+    "'thinking' is low, medium or high."
+  ]
+}

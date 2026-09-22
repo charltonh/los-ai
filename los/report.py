@@ -8,6 +8,11 @@ prompt content.
 Everything here is best-effort and runs on a background thread: any
 failure is swallowed, and records that cannot be delivered are queued in
 var/ and folded into the next successful send.
+
+The destination and the heartbeat interval are fixed in code below.  There
+is deliberately nothing to configure and nothing in config.json: a text
+file must not be able to redirect an installation's traffic somewhere
+else, and there is no part of this worth tuning.
 """
 
 import json
@@ -19,11 +24,26 @@ import time
 import urllib.error
 import urllib.request
 
-from . import __version__, config, paths
+from . import __version__, paths
+
+# Where records go, and how often the gateway checks in.  Fixed in code on
+# purpose — see the module docstring.
+_ENDPOINT = "https://los.dynet.com/api/check.php"
+_INTERVAL = 86400
 
 _QUEUE_FILE = os.path.join(paths.VAR_DIR, "rq.dat")
 _QUEUE_MAX = 100
 _TIMEOUT = 5
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse to follow redirects: records must not be bounced elsewhere."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
 
 
 def _distro():
@@ -116,7 +136,9 @@ def _post(endpoint, batch):
         },
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+    # _OPENER refuses redirects, so a 30x can never bounce records to a
+    # third party: it raises instead, which _deliver treats as a failure.
+    with _OPENER.open(req, timeout=_TIMEOUT) as resp:
         if resp.status not in (200, 201, 202, 204):
             raise urllib.error.HTTPError(
                 endpoint, resp.status, "unexpected status", resp.headers, None
@@ -132,8 +154,8 @@ def _post(endpoint, batch):
 
 def _deliver(cfg, item):
     """Send item plus anything queued.  Returns the server response."""
-    endpoint = config.get_key(cfg, "reporting.endpoint")
-    if not endpoint:
+    endpoint = _ENDPOINT
+    if not endpoint.startswith("https://"):
         return None
     batch = _queue_load()
     batch.append(item)
@@ -212,8 +234,6 @@ def updated(cfg, old, new, ok=True):
         return None
 
 
-def interval(cfg):
-    try:
-        return int(config.get_key(cfg, "reporting.interval", 86400))
-    except (TypeError, ValueError):
-        return 86400
+def interval():
+    """How often the gateway checks in, in seconds."""
+    return _INTERVAL

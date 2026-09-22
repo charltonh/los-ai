@@ -86,7 +86,46 @@ if you like, separate from the rest of the OS.
 ```
 
 The skeleton above is copied for every new entity, so the structure is
-consistent all the way down the tree.
+consistent all the way down the tree. (`ref/`, and the `data/` directories,
+are empty — they are kept in the repository by a `.gitkeep` file so they
+really are there after a fresh clone.)
+
+### What a new account is given
+
+A *user* is a root-level entity: the `/los/<username>/` directory itself.
+Creating one — `/los/sys/bin/los-user-manage create <name>`, or the
+installer's offer to run it — copies the entity skeleton, then layers on the
+starter files that belong to an account rather than to an entity:
+
+```
+/los/<name>/
+├── .config                    # which AI runs where, and what it may touch
+└── ai/
+    ├── aiconfig.ollama        # local model            (Ollama)
+    ├── aiconfig.openrouter    # cloud model            (OpenRouter)
+    ├── aiconfig.openclaw      # external agent         (OpenClaw)
+    ├── aiconfig.hermes        # external agent         (Hermes)
+    ├── prompt.default         # system prompt — default label
+    ├── prompt.agent           # system prompt — agent labels
+    ├── prompt.whatsapp        # system prompt — WhatsApp labels
+    └── memory/                # where the AI keeps notes between runs
+```
+
+**Sub-entities get the skeleton only** — `identity`, `goals`, `omni`,
+`entities`, `data/` and `ref/` — and no `.config` or `ai/` of their own.
+Their AI settings come from the labels in the root account's `.config`,
+whose filter lines (`+ money/invest`, `- private`, …) decide which of them
+each label may touch. An entity that needs its own model or prompt gets one
+by adding another label, not another directory.
+
+The `.config` arrives with a working label for each of the files above —
+`default` (local model, no account needed), `openrouter` (paste a key),
+`openclaw` and `hermes` (need the agent installed) and `whatsapp` +
+`whatsapp_incoming` (the channel's session and numbers, which `los config`
+fills in for you). Edit it, rename the labels, delete what you don't use: it
+is a starting point, not a spec. Its paths are absolute and were written for
+your account when the user was created, so the same templates work wherever
+LOS is installed. The templates themselves live in `/los/sys/newuser/`.
 
 ## Installation
 
@@ -95,27 +134,21 @@ consistent all the way down the tree.
 Decide where LOS should live.
 
 LOS is designed to live in its own directory at the root level: /los/.
-This gives flexibility for it to have its own filesystem or even encrypted filesystem.
-LOS doesn't need to be installed as root, but you may need to create this directory as
-root and give the ownership of the directory to the user you will be installing as.
+This gives flexibility to have its own filesystem or even encrypted filesystem.
+LOS doesn't need to be installed as root, but you may need root to create this
+directory and give its ownership to the user who will be installing it.
 
 ```bash
 sudo mkdir -p /los
 sudo chown $USER:$(id -gn) /los
-```
-
-You may also want to create a symlink from your home directory to /los:
-
-```bash
-cd ~
-ln -s /los los
-cd los
+ln -s /los/$USER ~/los
 ```
 
 Now that you are in the place where LOS should be installed, you may run the install script:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/charltonh/los-ai/master/install.sh | sh
+cd /los
+curl -fsSL https://los.dynet.com/install.sh | sh
 ```
 
 The installer checks the machine, asks a handful of questions, shows the
@@ -226,6 +259,8 @@ data or configuration:
 /los
 ├── sys/              # the LOS software (this repository)
 │   ├── config.json   # system configuration — los config writes here
+│   ├── skeleton/     # entity template: copied for every new entity
+│   ├── newuser/      # account-only extras: .config and ai/ for a new user
 │   ├── run/          # pid files
 │   ├── log/          # service logs and aicall.log, rotated automatically
 │   └── var/          # sessions, ids and other runtime state

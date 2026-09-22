@@ -493,7 +493,7 @@ class Gateway(object):
         self._check_for_update()
         self._announce()
 
-        beat_every = report.interval(self.cfg)
+        beat_every = report.interval()
         try:
             while not stop_requested["flag"]:
                 time.sleep(1)
