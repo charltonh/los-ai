@@ -20,6 +20,12 @@
     let canvasMode = 'empty'; // 'empty' | 'history' | 'streaming'
     // Block to flash-highlight after the next render: {messageId, jobId}
     let pendingHighlight = null;
+    // One-shot flag: when true the NEXT render pins the view to the newest
+    // (bottom) block. Set when opening a task, when new content lands at the
+    // bottom, and when one of the bottom two blocks is expanded — every other
+    // render preserves the scroll position so the block the user is reading
+    // never jumps away.
+    let pinToBottom = false;
     // Direct callback — avoids CustomEvent dispatch issues entirely
     let _streamDoneCallback = null;
 
@@ -119,6 +125,8 @@
 
             if (!taskId) { showEmpty(); return; }
             updateCanvasTitle(taskId, false, null, currentEntityPath);
+            // Opening a task starts the view at the newest entry.
+            pinToBottom = true;
             loadHistory(taskId, entityPath);
         },
 
@@ -187,7 +195,10 @@
                     canvasMode = 'history';
                     const pairs = buildPairs(currentHistory);
                     if (pairs.length > 0) {
+                        // The newly saved/expanded pair is the bottom block, so
+                        // it is fine (and expected) to stay pinned to the bottom.
                         expandedPairs.add(pairs.length - 1);
+                        pinToBottom = true;
                     }
                     renderHistory();
                 }
@@ -216,6 +227,11 @@
     function renderHistory() {
         const histEl = document.getElementById('canvas-history');
         if (!histEl) return;
+
+        // Consume the pin request exactly once. Any render that is not a fresh
+        // load / new bottom content must preserve the current scroll position.
+        const shouldPinToBottom = pinToBottom;
+        pinToBottom = false;
 
         if (!currentHistory || currentHistory.length === 0) {
             pendingHighlight = null;   // nothing to reveal
@@ -354,7 +370,9 @@
                     target.classList.remove('canvas-pair-highlight');
                 }, HIGHLIGHT_MS);
             }
-        } else {
+        } else if (shouldPinToBottom) {
+            // Fresh history load (or new content at the bottom): start at the
+            // newest block. Every other re-render leaves the view untouched.
             histEl.scrollTop = histEl.scrollHeight;
         }
 
@@ -411,14 +429,41 @@
         return pairs;
     }
 
-    // Toggle expand/collapse of a pair by re-rendering
+    // Toggle expand/collapse of a pair by re-rendering.
+    // The view is anchored to the toggled block so expanding/collapsing it never
+    // yanks the user down to the bottom of the canvas — with one exception:
+    // opening one of the bottom two blocks reveals content below the fold, so
+    // that case follows it down and stays pinned to the bottom.
     function togglePair(idx) {
-        if (expandedPairs.has(idx)) {
-            expandedPairs.delete(idx);
-        } else {
-            expandedPairs.add(idx);
+        const histEl = document.getElementById('canvas-history');
+        // Remember where the block sits on screen before the re-render
+        let anchorTop = null;
+        if (histEl) {
+            const before = histEl.querySelector(`.canvas-pair[data-pair-idx="${idx}"]`);
+            if (before) anchorTop = before.getBoundingClientRect().top;
         }
+
+        const willExpand = !expandedPairs.has(idx);
+        if (willExpand) {
+            expandedPairs.add(idx);
+        } else {
+            expandedPairs.delete(idx);
+        }
+
+        // Only expanding one of the bottom two blocks re-locks the view to the
+        // bottom — those are the two whose content lands at/below the fold.
+        const pairs = currentHistory ? buildPairs(currentHistory) : [];
+        const isBottomBlock = pairs.length > 0 && idx >= pairs.length - 2;
+        const shouldPin = willExpand && isBottomBlock;
+        pinToBottom = shouldPin;
         renderHistory();
+
+        // Otherwise put the block back exactly where it was (collapsing content
+        // above it or clamping the scroll offset can otherwise shift it).
+        if (!shouldPin && histEl && anchorTop !== null) {
+            const after = histEl.querySelector(`.canvas-pair[data-pair-idx="${idx}"]`);
+            if (after) histEl.scrollTop += after.getBoundingClientRect().top - anchorTop;
+        }
     }
 
     // Delete a conversation pair from history after confirmation

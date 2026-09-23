@@ -2306,6 +2306,9 @@ def call_agent(agent_config, prompt, los_config=None):
             '    -d \'{"message": "YOUR_RESULT_HERE"}\'\n\n'
             "Replace YOUR_RESULT_HERE with the actual message you want to deliver.\n"
             "The URL already contains the authentication token — no extra headers needed.\n"
+            "Keep the URL query parameters exactly as given (user, path, token, label);\n"
+            "the label parameter is what identifies you as the sender, so the result is\n"
+            "attributed to the right agent. You may set job= to any id of your choosing.\n"
             "[/LOS-CALLBACK-INSTRUCTIONS]"
         )
         log_message("AGENT", f"callback_url_injected={webhook_url}")

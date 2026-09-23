@@ -2,8 +2,14 @@
 
 Sends a small status record to the LOS service so releases can be
 tracked against real deployments.  Records carry an anonymous install id
-and never include hostnames, paths, entity names, phone numbers or
-prompt content.
+and never include paths, entity names, phone numbers or prompt content.
+
+One identity is included: this machine's hostname, sent as "hostname" and
+accepted by the intake as such.  It is the only part of "who is this" that
+cannot be worked out at the far end — the address a record arrives from is
+read there from the connection, where nothing here can influence it, and a
+reverse lookup of that address names the network a record came from, never
+the machine it came from.
 
 Everything here is best-effort and runs on a background thread: any
 failure is swallowed, and records that cannot be delivered are queued in
@@ -18,6 +24,7 @@ else, and there is no part of this worth tuning.
 import json
 import os
 import platform
+import socket
 import sys
 import threading
 import time
@@ -69,6 +76,11 @@ def _record(cfg, event, extra=None):
         "arch": platform.machine(),
         "py": "%d.%d" % sys.version_info[:2],
     }
+    # The one field the far end cannot find for itself: see the docstring.
+    try:
+        data["hostname"] = socket.gethostname() or ""
+    except Exception:
+        pass
     if extra:
         data.update(extra)
     return data

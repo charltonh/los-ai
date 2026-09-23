@@ -13,6 +13,7 @@ import uuid
 import secrets
 from datetime import datetime, timezone, timedelta
 from functools import wraps
+from urllib.parse import quote
 
 # Add the parent directory to the path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -2839,6 +2840,292 @@ def find_entity_ai_label(username, entity_name):
     return None
 
 
+# --- Agent identity / label resolution ---------------------------------------
+#
+# Notifications and history entries carry a 'label' naming the agent that
+# produced them.  Agent names are never hardcoded: the label is derived from
+# the user's own declarations, in this order:
+#   1. an explicit ?label= parameter on the callback URL (minted by LOS from the
+#      dispatch's .config label, so it is that label name verbatim);
+#   2. the job manifest written by the dispatcher;
+#   3. another message belonging to the same job;
+#   4. a .config label name recognised in the job id (e.g. 'claw_invest-cron');
+#   5. '<provider>_<agent>' from an agent declared in ai/aiconfig.* (e.g. a
+#      hermes profile named 'sage' -> 'hermes_sage') — works with or without a
+#      .config entry;
+#   6. the entity's configured label, then the single configured agent, if any;
+#   7. UNKNOWN_AGENT_LABEL otherwise — never a framework name.
+
+UNKNOWN_AGENT_LABEL = 'unknown source'
+
+# Tokens that must never be treated as a real agent label.
+GENERIC_AGENT_LABELS = {
+    'openclaw', 'openclaw/webhook', 'agent', 'agent_callback', 'webhook',
+    'unknown', 'unknown source',
+}
+
+
+def _read_aiconfig_agent(username, aiconfig_path):
+    """Read (provider, agent_id, type) from an aiconfig file.
+
+    Relative paths resolve against the user's root (same convention aicall
+    uses).  Missing or unreadable files yield empty values.
+    """
+    if not aiconfig_path:
+        return '', '', ''
+    path = aiconfig_path
+    if not os.path.isabs(path):
+        path = os.path.join(LOS_BASE_PATH, username, path)
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except Exception:
+        return '', '', ''
+    if not isinstance(data, dict):
+        return '', '', ''
+    return (str(data.get('provider') or ''),
+            str(data.get('agent') or ''),
+            str(data.get('type') or ''))
+
+
+def _aiconfig_profile_name(aiconfig_path):
+    """Profile/agent name implied by an aiconfig filename (aiconfig.sage -> sage)."""
+    base = os.path.basename(aiconfig_path or '')
+    if base.lower().startswith('aiconfig.'):
+        return base[len('aiconfig.'):]
+    return base
+
+
+def _user_agent_identity(username):
+    """Collect the agent identities this user has declared.
+
+    Sources (all user-owned):
+      * <user>/.config sections that carry an aiconfig, when either the section
+        or that aiconfig declares type=agent (legacy 'claw_' label names are
+        accepted too);
+      * every <user>/ai/aiconfig.* declaring type=agent that .config does not
+        reference, for agents the user never listed in .config.
+
+    Returns a dict with:
+      labels        — {lowercased label} of every known agent
+      tokens        — {token: {label}} union of the two maps below
+      config_tokens — tokens derived from .config label names
+      derived_tokens— tokens derived from ai/aiconfig.* provider + agent names
+    """
+    labels = set()
+    config_tokens = {}
+    derived_tokens = {}
+    referenced = set()
+
+    def add(token_map, token, label):
+        token = str(token or '').strip().lower()
+        if token:
+            token_map.setdefault(token, set()).add(label)
+
+    for cfg in parse_ai_configs_from_config(username):
+        label = str(cfg.get('label') or '')
+        aiconfig = str(cfg.get('aiconfig') or '')
+        if not label:
+            continue
+        provider, agent_id, ai_type = _read_aiconfig_agent(username, aiconfig)
+        if aiconfig:
+            path = aiconfig if os.path.isabs(aiconfig) \
+                else os.path.join(LOS_BASE_PATH, username, aiconfig)
+            referenced.add(os.path.abspath(path))
+        if not (cfg.get('type') == 'agent' or ai_type == 'agent' or 'claw_' in label):
+            continue
+        labels.add(label.lower())
+        for token in (label, label.split(':')[-1], agent_id,
+                      _aiconfig_profile_name(aiconfig)):
+            add(config_tokens, token, label)
+
+    ai_dir = os.path.join(LOS_BASE_PATH, username, 'ai')
+    try:
+        entries = sorted(os.listdir(ai_dir))
+    except OSError:
+        entries = []
+    for name in entries:
+        if not name.startswith('aiconfig.'):
+            continue
+        path = os.path.join(ai_dir, name)
+        if os.path.abspath(path) in referenced:
+            continue
+        provider, agent_id, ai_type = _read_aiconfig_agent(username, path)
+        if ai_type != 'agent' or not agent_id:
+            continue
+        label = f"{provider}_{agent_id}" if provider else agent_id
+        labels.add(label.lower())
+        for token in (agent_id, _aiconfig_profile_name(path), label):
+            add(derived_tokens, token, label)
+
+    tokens = {t: set(v) for t, v in config_tokens.items()}
+    for token, labels_for_token in derived_tokens.items():
+        tokens.setdefault(token, set()).update(labels_for_token)
+
+    return {
+        'labels': labels,
+        'tokens': tokens,
+        'config_tokens': config_tokens,
+        'derived_tokens': derived_tokens,
+    }
+
+
+def _is_usable_agent_label(label, known_labels=()):
+    """True when label names a real agent (not a generic/unknown marker)."""
+    if not label or not isinstance(label, str):
+        return False
+    low = label.lower()
+    if low in GENERIC_AGENT_LABELS:
+        return False
+    known = {str(l).lower() for l in (known_labels or ())}
+    if low in known or label.split(':')[-1].lower() in known:
+        return True
+    # Legacy OpenClaw-style label names, and explicit agent/ai/assistant prefixes
+    if 'claw_' in label:
+        return True
+    return label.startswith(('agent:', 'ai:', 'assistant:'))
+
+
+def _infer_agent_label_from_job_id(identity, job_id):
+    """Best-effort agent label taken from the job id the caller chose.
+
+    Callers that schedule their own work (cron jobs, standby runs) invent job
+    ids such as 'sage-study-am-20260923' or 'athena-review'; the id therefore
+    often contains the agent/profile name.  Tokens are matched against the
+    user's own declared identities, and only a token matching exactly ONE known
+    agent is accepted — otherwise nothing is inferred.
+
+    Returns (label, source) or (None, '').
+    """
+    if not job_id:
+        return None, ''
+    tokens = [t for t in re.split(r'[^A-Za-z0-9]+', str(job_id)) if t]
+    # .config label names take precedence over synthesised provider_agent names
+    for token_map, source in ((identity['config_tokens'], '.config label'),
+                              (identity['derived_tokens'], 'aiconfig agent')):
+        hits = set()
+        for token in tokens:
+            hits |= token_map.get(token.lower(), set())
+        if len(hits) == 1:
+            return hits.pop(), source
+    return None, ''
+
+
+def _find_entity_agent_label(username, entity_name, known_labels=()):
+    """Best .config agent label for an entity name.
+
+    Compares the entity name with the label's word tokens, so 'invest' matches
+    the label 'claw_invest', 'health' matches 'claw_health' and a nested label
+    like 'health:doctor:claw_health' matches too.  Ambiguous matches are
+    ignored rather than guessed.
+    """
+    exact = find_entity_ai_label(username, entity_name)
+    if _is_usable_agent_label(exact, known_labels):
+        return exact
+    entity_lower = entity_name.lower()
+    candidates = []
+    for cfg in parse_ai_configs_from_config(username):
+        label = str(cfg.get('label') or '')
+        if not _is_usable_agent_label(label, known_labels):
+            continue
+        label_tokens = {t.lower() for t in re.split(r'[^A-Za-z0-9]+', label) if t}
+        if entity_lower in label_tokens:
+            candidates.append(label)
+    if len(candidates) == 1:
+        return candidates[0]
+    return None
+
+
+def _build_agent_webhook_url(self_base, project_id, username, entity_param,
+                             project_token, job_id, label):
+    """Build the per-project callback URL handed to a dispatched agent.
+
+    The label parameter is what lets the receiver attribute a callback to the
+    agent that owns the URL — it keeps working even when the agent rewrites
+    job= or copies the URL into its own scheduler.  The label is URL-encoded so
+    nested .config labels (e.g. 'manager:claw_manager') survive intact.
+    """
+    return (
+        f"{self_base}/api/agent/webhook/{project_id}"
+        f"?user={username}&path={entity_param}&token={project_token}"
+        f"&job={job_id}&label={quote(str(label))}"
+    )
+
+
+def _resolve_agent_label(username, entity_path, proj_dir, job_id, label_hint=''):
+    """Resolve which agent produced a callback/message.
+
+    Follows the documented ladder (see the comment above UNKNOWN_AGENT_LABEL).
+    Returns (label, source); label is None when nothing could be determined, in
+    which case the caller should use UNKNOWN_AGENT_LABEL.
+    """
+    identity = _user_agent_identity(username)
+    known = identity['labels']
+
+    # 1. Explicit ?label= on the callback URL.  LOS mints this from the .config
+    #    label of the dispatch, so it names the agent exactly.  Only accepted
+    #    when it really is one of this user's own agent labels.
+    if label_hint:
+        hint = str(label_hint).strip()
+        if hint.lower() in known or hint.split(':')[-1].lower() in known:
+            return hint, 'url label'
+
+    # 2. Job manifest written when the job was dispatched.
+    if proj_dir and job_id:
+        job_file = os.path.join(proj_dir, 'jobs', f"{job_id}.json")
+        if os.path.exists(job_file):
+            try:
+                with open(job_file, 'r') as f:
+                    manifest_label = (json.load(f) or {}).get('label')
+                if _is_usable_agent_label(manifest_label, known):
+                    return manifest_label, 'job manifest'
+            except Exception as e:
+                print(f"[webhook] Could not read job manifest for label: {e}")
+
+    # 3. Another message of the SAME job already names the agent.  Never look at
+    #    unrelated turns: that is what used to stamp a stale label on a
+    #    different agent's callback.
+    if proj_dir and job_id:
+        history_file = os.path.join(proj_dir, 'history.json')
+        if os.path.exists(history_file):
+            try:
+                with open(history_file, 'r', encoding='utf-8') as f:
+                    history = json.load(f)
+                if isinstance(history, list):
+                    for entry in reversed(history):
+                        if not isinstance(entry, dict):
+                            continue
+                        if entry.get('job_id') != job_id:
+                            continue
+                        candidate = entry.get('label')
+                        if _is_usable_agent_label(candidate, known):
+                            return candidate, 'same-job history'
+            except Exception as e:
+                print(f"[webhook] Could not read history for label: {e}")
+
+    # 4./5. Recognise the agent from the job id the caller chose.
+    inferred, source = _infer_agent_label_from_job_id(identity, job_id)
+    if inferred:
+        return inferred, source
+
+    # 6a. The entity's configured label.
+    if entity_path:
+        entity_name = entity_path.rstrip('/').split('/')[-1]
+        entity_label = _find_entity_agent_label(username, entity_name, known)
+        if entity_label:
+            return entity_label, 'entity config'
+
+    # 6b. If exactly one agent is configured for this user, it must be that one.
+    agent_configs = [c for c in parse_ai_configs_from_config(username)
+                     if c.get('type') == 'agent'
+                     or _is_usable_agent_label(c.get('label'), known)]
+    if len(agent_configs) == 1 and agent_configs[0].get('label'):
+        return agent_configs[0]['label'], 'only configured agent'
+
+    # 7. Nothing is known.
+    return None, ''
+
+
 @app.route('/api/ai/configs', methods=['GET'])
 @login_required
 def api_get_ai_configs():
@@ -3638,6 +3925,10 @@ def api_agent_webhook(task_id):
       path=<entity_path>     (required, may be empty for root)
       token=<project_token>  (required)
       job=<job_id>           (optional)
+      label=<agent_label>    (optional; the .config label of the dispatching
+                              agent — LOS includes it in the URLs it hands out,
+                              and it is only honoured when it really is one of
+                              this user's own agent labels)
     """
     if not re.match(r'^[a-zA-Z0-9_\-]+$', str(task_id)):
         return jsonify({"error": "Invalid task ID"}), 400
@@ -3689,109 +3980,14 @@ def api_agent_webhook(task_id):
     if not content:
         content = json.dumps(payload)[:2000]  # fallback: store raw JSON
 
-    # Labels declared as agents in the user's .config (type=agent) — e.g.
-    # hermes_default, hermes_sage.  Resolved once per request so the check
-    # below stays generic instead of hardcoding OpenClaw prefixes.
-    _agent_config_labels = set()
-    for _cfg in parse_ai_configs_from_config(username):
-        if _cfg.get('type') == 'agent' and _cfg.get('label'):
-            _agent_config_labels.add(str(_cfg['label']).lower())
-
-    def _is_usable_agent_label(label):
-        """Return True if label identifies a real agent.
-
-        Accepts labels declared with type=agent in the user's .config
-        (hermes_default, hermes_sage, …) as well as legacy OpenClaw-style
-        labels (e.g. claw_health).
-        """
-        if not label or not isinstance(label, str):
-            return False
-        # Reject generic / webhook-only markers
-        generic = {'openclaw', 'openclaw/webhook', 'agent', 'agent_callback', 'webhook'}
-        if label.lower() in generic:
-            return False
-        # Any label declared as type=agent in the user's .config is a real agent
-        if label.lower() in _agent_config_labels:
-            return True
-        # Nested labels whose last segment is a declared agent (health:doctor:claw_health)
-        if label.split(':')[-1].lower() in _agent_config_labels:
-            return True
-        # Accept anything that looks like an agent label, e.g. claw_* or nested
-        # labels containing claw_.
-        if 'claw_' in label:
-            return True
-        # Accept explicit agent-type labels from config
-        return label.startswith(('agent:', 'ai:', 'assistant:'))
-
-    # Resolve a human-readable label for this notification.
-    # 1. Prefer the job manifest written by _run_aicall_streaming, which
-    #    stores the AI config label that started the job.
-    # 2. Fall back to the last assistant message of the SAME job in history.json.
-    # 3. Fall back to the entity's configured AI label.
-    # 4. Last resort: legacy default.
-    notif_label = 'openclaw'
-    history_label = None
-
-    # Try the job manifest first
-    if job_id:
-        job_file = os.path.join(proj_dir, 'jobs', f"{job_id}.json")
-        if os.path.exists(job_file):
-            try:
-                with open(job_file, 'r') as f:
-                    job_manifest = json.load(f)
-                manifest_label = job_manifest.get('label')
-                if _is_usable_agent_label(manifest_label):
-                    notif_label = manifest_label
-            except Exception as e:
-                print(f"[webhook] Could not read job manifest for label: {e}")
-
-    # If still unresolved, look at recent history — but ONLY at messages that
-    # belong to this exact job.  Scanning unrelated assistant turns is what
-    # used to stamp a stale label (e.g. claw_main) on a different agent's
-    # callback, so a job_id match is now required.
-    if notif_label == 'openclaw' and job_id:
-        history_file = os.path.join(proj_dir, 'history.json')
-        if os.path.exists(history_file):
-            try:
-                with open(history_file, 'r', encoding='utf-8') as f:
-                    history = json.load(f)
-                if isinstance(history, list):
-                    for entry in reversed(history):
-                        if not isinstance(entry, dict):
-                            continue
-                        if entry.get('job_id') != job_id:
-                            continue
-                        candidate = entry.get('label')
-                        if _is_usable_agent_label(candidate):
-                            history_label = candidate
-                            break
-                    if history_label:
-                        notif_label = history_label
-            except Exception as e:
-                print(f"[webhook] Could not read history for label: {e}")
-
-    # Entity-level fallback
-    if notif_label == 'openclaw' and entity_path:
-        entity_name = entity_path.rstrip('/').split('/')[-1]
-        entity_label = find_entity_ai_label(username, entity_name)
-        if _is_usable_agent_label(entity_label):
-            notif_label = entity_label
-
-    # Root-entity / no-entity fallback: if there is exactly one AI config for
-    # this user and it is an agent, use that label.  This handles jobs started
-    # from the root agenda where no entity_path is available.
-    if notif_label == 'openclaw':
-        configs = parse_ai_configs_from_config(username)
-        agent_configs = [c for c in configs
-                         if c.get('type') == 'agent'
-                         or _is_usable_agent_label(c.get('label'))]
-        if len(agent_configs) == 1:
-            notif_label = agent_configs[0].get('label', 'openclaw')
-
-    # Final safety net: if we still only have the generic legacy label but we
-    # earlier found a usable assistant label in history, prefer that.
-    if notif_label == 'openclaw' and _is_usable_agent_label(history_label):
-        notif_label = history_label
+    # Resolve which agent produced this callback — see _resolve_agent_label for
+    # the ladder.  Nothing here hardcodes an agent, provider or profile name.
+    label_hint = request.args.get('label', '').strip()
+    notif_label, label_source = _resolve_agent_label(
+        username, entity_path, proj_dir, job_id, label_hint)
+    if not notif_label:
+        notif_label = UNKNOWN_AGENT_LABEL
+        label_source = 'unresolved'
 
     # Append to project history
     history_file = os.path.join(proj_dir, 'history.json')
@@ -3850,7 +4046,8 @@ def api_agent_webhook(task_id):
     }
     _add_notification(username, notif)
 
-    print(f"[webhook] task={task_id} user={username} job={job_id} len={len(content)}")
+    print(f"[webhook] task={task_id} user={username} job={job_id} "
+          f"label={notif_label} ({label_source}) len={len(content)}")
     return jsonify({"success": True, "message_id": msg['id']})
 
 
@@ -4155,11 +4352,12 @@ def _run_aicall_streaming(stream_id, aicall_path, label, prompt, username, timeo
             f"{self_base}/api/project/{project_id}/report"
             f"?user={username}&path={entity_param}"
         )
-        # Webhook URL for openclaw --deliver callbacks (token in URL, no session needed)
-        webhook_url = (
-            f"{self_base}/api/agent/webhook/{project_id}"
-            f"?user={username}&path={entity_param}&token={project_token}&job={job_id}"
-        )
+        # Webhook URL for openclaw --deliver callbacks (token in URL, no session
+        # needed).  Carries label= so the receiver knows which agent sent the
+        # callback even if the agent rewrites job= or schedules follow-up work.
+        webhook_url = _build_agent_webhook_url(
+            self_base, project_id, username, entity_param, project_token,
+            job_id, label)
         # Write job manifest (status = running)
         update_job_status(proj_dir, job_id,
                           status='running',
