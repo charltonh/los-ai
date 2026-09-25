@@ -1,6 +1,14 @@
 
 # Changelog
 
+## [1.0.4] - 2026-09-25
+### Added
+- Version info in the LOS Dashboard
+### Fixed
+- Updating fetch bug
+- MCP functions filter prompting tweak
+
+
 ## [1.0.3] - 2026-09-24
 ### Fixed
 - Updating now has option to overwrite instead of just breaking

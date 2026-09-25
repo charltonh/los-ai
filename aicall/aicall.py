@@ -1007,12 +1007,29 @@ def _build_role_preamble(label, config=None, entity_rel_path='', for_agent=False
             "and then provide a conversational confirmation."
         )
 
-    return (
+    generic = (
         "You are an intelligent assistant operating inside the LOS system. "
         "Your job is to help the user by reasoning step by step, then either "
         "calling an LOS MCP tool (when data or action is needed) or responding "
         "with plain text. Always follow the operational rules below."
     )
+    if for_agent:
+        # The advertised tool list is filtered per label (e.g. whatsapp_* is
+        # hidden for non-WhatsApp labels). Tell the agent the list may be a
+        # subset and where the full set lives — without naming hidden tools —
+        # so it looks one up instead of reporting it has no route.
+        mcp_config = os.path.join(
+            os.environ.get("LOS_SYS", "/los/sys"),
+            "aicall_mcp", "mcp_config.json")
+        generic += (
+            " The MCP tool list below may be filtered for this context. If you are "
+            "asked to do something you cannot do with the tools shown, look up the "
+            f"full LOS-AI MCP tool set first ({mcp_config} and the MCP server "
+            "roots) rather than assuming you cannot, then call the tool you need "
+            "with the same JSON call format — LOS dispatches it and records the "
+            "result."
+        )
+    return generic
 
 
 def _filter_tools_for_label(tools_description, label):

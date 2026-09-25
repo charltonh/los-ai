@@ -141,7 +141,6 @@ directory and give its ownership to the user who will be installing it.
 ```bash
 sudo mkdir -p /los
 sudo chown $USER:$(id -gn) /los
-ln -s /los/$USER ~/los
 ```
 
 Now that you are in the place where LOS should be installed, you may run the install script:

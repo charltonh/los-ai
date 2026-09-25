@@ -49,6 +49,26 @@ LOS_BASE_PATH = "/los"
 SKELETON_DIR = os.path.join(os.path.dirname(__file__), '..', 'skeleton') # Path to /los/sys/skeleton
 ALLOWED_ENTITY_NAME_REGEX = re.compile(r'^[a-zA-Z0-9_-]+$')
 
+# Directory holding the `los` package, i.e. /los/sys.  LOS_SYS is honoured so
+# the lookup keeps working when the tree is installed elsewhere.
+LOS_SYS_DIR = os.environ.get(
+    'LOS_SYS', os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def get_los_version():
+    """Return the installed LOS version (e.g. "1.0.2"), or "unknown".
+
+    Read straight from the `los` package so the version shown in the dashboard
+    can never drift from the code that is actually running.
+    """
+    try:
+        if LOS_SYS_DIR not in sys.path:
+            sys.path.insert(0, LOS_SYS_DIR)
+        from los import __version__
+        return __version__
+    except Exception:
+        return 'unknown'
+
 # --- Decorators ---
 def login_required(f):
     @wraps(f)
@@ -377,8 +397,10 @@ def logout():
 @app.route('/')
 @login_required
 def index():
-    # Pass the username as the base agenda title
-    return render_template('index.html', agenda_title=session['username'])
+    # Pass the username as the base agenda title, plus the running LOS version
+    # for the LOS Dashboard system-info list.
+    return render_template('index.html', agenda_title=session['username'],
+                           los_version=get_los_version())
 
 @app.route('/static/<path:path>')
 def serve_static(path):
