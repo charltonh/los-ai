@@ -5,7 +5,7 @@ system.  Deliberately stdlib-only, so it can bootstrap an installation
 before any virtualenv exists.
 """
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 
 # Upstream repository used by `los update`.
 REPO = "charltonh/los-ai"

@@ -30,8 +30,14 @@ class UpdateError(Exception):
 # ── git helpers ─────────────────────────────────────────────────────────
 
 def git(*args, **kw):
-    """Run git in the software directory and return stdout."""
+    """Run git in the software directory and return stdout.
+
+    Output is stripped of surrounding whitespace by default, which is what
+    every caller but the porcelain parser wants; pass strip=False for the
+    verbatim bytes, where leading spaces are significant.
+    """
     check = kw.pop("check", True)
+    strip = kw.pop("strip", True)
     result = subprocess.run(
         ["git"] + list(args),
         cwd=paths.SYS_DIR,
@@ -42,7 +48,7 @@ def git(*args, **kw):
     if check and result.returncode != 0:
         raise UpdateError("git %s failed: %s"
                           % (" ".join(args), result.stderr.strip()))
-    return result.stdout.strip()
+    return result.stdout.strip() if strip else result.stdout
 
 
 def is_git_checkout():
@@ -63,8 +69,27 @@ def current_ref():
         return "unknown"
 
 
-def working_tree_dirty():
-    return bool(git("status", "--porcelain"))
+def changed_files():
+    """The paths with uncommitted changes, for display.
+
+    Parsed from the NUL-delimited porcelain form so paths containing
+    spaces come through verbatim rather than quoted.  Untracked files are
+    included: they are just as capable of getting in the checkout's way.
+    """
+    entries = git("status", "--porcelain", "-z", strip=False).split("\0")
+    files = []
+    i = 0
+    while i < len(entries):
+        entry = entries[i]
+        if not entry:
+            i += 1
+            continue
+        status = entry[:2]
+        files.append(entry[3:])
+        # A rename or copy names the original file in the next entry; show
+        # only where the file is now.
+        i += 2 if ("R" in status or "C" in status) else 1
+    return files
 
 
 def ensure_remote(repo):
@@ -324,13 +349,24 @@ def run(args):
     if args.check:
         return 1 if not args.to else 0
 
-    # Safety gates.
-    if working_tree_dirty():
-        ui.warn("%s has local modifications" % paths.SYS_DIR)
-        if not args.force:
-            ui.info("commit or stash them, or re-run with --force")
-            return 1
-        ui.step("stashing local changes")
+    # Safety gate.  Rather than refusing to run when the working tree has
+    # been edited, name what changed and offer to set it aside.  The edits
+    # go into a stash, so agreeing is not destructive and `git stash pop`
+    # brings them back.  --force and --yes skip the question and take the
+    # default.
+    changes = changed_files()
+    if changes:
+        ui.warn("%s has local modifications:" % paths.SYS_DIR)
+        for path in changes:
+            print("   %s" % path)
+        print()
+        overwrite = args.force or args.yes
+        if not overwrite:
+            overwrite = ui.ask_yes_no("Overwrite these local changes?", True)
+        if not overwrite:
+            ui.info("cancelled — your local changes are untouched")
+            return 0
+        ui.step("setting local changes aside (recover with `git stash pop`)")
         git("stash", "push", "-u", "-m", "los update %s" % int(time.time()))
 
     if not args.yes and not args.to:

@@ -91,7 +91,7 @@ def build_parser():
     p.add_argument("-y", "--yes", action="store_true",
                    help="do not ask for confirmation")
     p.add_argument("--force", action="store_true",
-                   help="update even with local changes")
+                   help="overwrite local changes without asking")
 
     sub.add_parser("rollback", help="return to the previous version")
 

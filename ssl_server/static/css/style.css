@@ -1329,9 +1329,37 @@ body.sidebar-visible .dashboard {
     padding: var(--spacing-sm) 0;
 }
 
-.fc-day-today {
+/* Month view: tint today's whole cell (this also covers the all-day row of the
+   week view, where the all-day area is rendered as day-grid cells). */
+.fc .fc-daygrid-day.fc-day-today {
 /*    background-color: rgba(74, 111, 165, 0.5) !important; */
     background-color: rgba(124, 161, 215, 0.5) !important;
+}
+
+/* Day/week views: keep today identifiable via its column header, but don't
+   flood the whole day with colour. */
+.fc .fc-col-header-cell.fc-day-today {
+    background-color: rgba(124, 161, 215, 0.5) !important;
+}
+
+/* Day/week views: highlight only the current hour instead of the whole day.
+   FullCalendar renders the hour rows in the time-axis table only, so the band
+   is painted as a background gradient on today's column. The position/size are
+   written as percentages of today's column height by updateNowBand() in
+   calendar.js (see --fc-now-band-top / --fc-now-band-height), which keeps the
+   highlight behind the events and free of any injected DOM. */
+.fc .fc-timegrid-col.fc-day-today {
+    background-color: transparent !important;
+    background-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent var(--fc-now-band-top, 0%),
+        rgba(124, 161, 215, 0.35) var(--fc-now-band-top, 0%),
+        rgba(124, 161, 215, 0.35) calc(var(--fc-now-band-top, 0%) + var(--fc-now-band-height, 0%)),
+        transparent calc(var(--fc-now-band-top, 0%) + var(--fc-now-band-height, 0%)),
+        transparent 100%
+    ) !important;
+    background-repeat: no-repeat !important;
 }
 
 .fc-event {

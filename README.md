@@ -200,6 +200,13 @@ ones that need it, and restarts anything that dies. There is no dependency on
 systemd or OpenRC — but `los install` can generate a unit or init script for
 either if you want LOS to start at boot.
 
+`los update` checks out the newest release tag over the code in `/los/sys`.
+If you have edited any tracked files it names them and asks before
+overwriting; say yes and your edits are set aside in a git stash, which
+`git stash pop` restores. `--force` overwrites without asking, `--yes`
+accepts the default (yes), and `--check` only reports without changing
+anything.
+
 ## Services
 
 | Service | Path | Port | What it does |

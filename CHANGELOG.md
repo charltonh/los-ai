@@ -1,6 +1,12 @@
 
 # Changelog
 
+## [1.0.3] - 2026-09-24
+### Fixed
+- Updating now has option to overwrite instead of just breaking
+- Calendar day view improvement
+
+
 ## [1.0.2] - 2026-09-23
 ### Fixed
 - Fixed version bump

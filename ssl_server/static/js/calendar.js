@@ -143,6 +143,8 @@ function initCalendar() {
         datesSet: function(info) {
             // Re-inject the end-of-day 12am marker after every date navigation / view render
             setTimeout(injectEndOfDayLabel, 0);
+            // Re-measure where the current hour sits in the (re-rendered) grid
+            setTimeout(updateNowBand, 0);
         },
         eventContent: function(arg) { // Custom render function for event content
             // Show title and description if available
@@ -174,6 +176,17 @@ function initCalendar() {
     });
 
     calendar.render();
+
+    // Keep the current-hour highlight in sync while the tab stays open: the
+    // interval catches hour boundaries, the resize hook re-measures after
+    // layout changes (window resize, canvas focus toggle, ...).
+    setInterval(updateNowBand, 60 * 1000);
+
+    let nowBandTimer = null;
+    window.addEventListener('resize', () => {
+        clearTimeout(nowBandTimer);
+        nowBandTimer = setTimeout(updateNowBand, 200);
+    });
 }
 function setupEventHandlers() {
     // Custom dblclick listener removed - using double-click detection on dateClick/eventClick
@@ -773,3 +786,119 @@ function injectEndOfDayLabel() {
         }
     }
 }
+
+/**
+ * Highlight only the *current hour* on today's column in the time-grid
+ * (week / day) views, instead of tinting the whole day.
+ *
+ * FullCalendar renders the hour rows (`.fc-timegrid-slot-lane`) once, in the
+ * time-axis table, so a row can't simply be styled. Instead we measure where
+ * the current hour starts and ends, relative to today's column, and publish
+ * those as percentages of that column's height via two CSS custom properties
+ * on #calendar (--fc-now-band-top / --fc-now-band-height). style.css paints
+ * that band as a background gradient on `td.fc-timegrid-col.fc-day-today`,
+ * which keeps it behind the events and needs no injected DOM.
+ *
+ * The row heights of the slots table are synced with the day columns, so the
+ * percentages line up across the grid. Re-run on every render, on resize and
+ * on an interval so the band follows the clock.
+ */
+function updateNowBand() {
+    if (!calendar || !calendarEl) return;
+
+    const view = calendar.view;
+    if (!view || view.type.indexOf('timeGrid') !== 0) {
+        // Month view: the whole-cell "today" tint is handled by CSS alone.
+        clearNowBand();
+        return;
+    }
+
+    const slotsTable = calendarEl.querySelector('.fc-timegrid-slots table');
+    if (!slotsTable) return;
+
+    // Today's column is the element the band is painted on, so measure against
+    // it directly (this also ignores the extra 12am marker row that
+    // injectEndOfDayLabel() appends to the slots table). Nothing to do when
+    // today isn't part of the rendered range.
+    const col = calendarEl.querySelector('.fc-timegrid-col.fc-day-today');
+    if (!col) {
+        clearNowBand();
+        return;
+    }
+
+    const colRect = col.getBoundingClientRect();
+    if (!colRect.height) return;
+
+    // Pixel geometry of every rendered slot, relative to the top of the column.
+    const slots = [];
+    slotsTable.querySelectorAll('.fc-timegrid-slot-lane[data-time]').forEach(cell => {
+        const minutes = parseSlotTime(cell.dataset.time);
+        if (minutes === null) return;
+        const rect = cell.getBoundingClientRect();
+        slots.push({ minutes: minutes, top: rect.top - colRect.top, height: rect.height });
+    });
+    if (slots.length < 2) return;
+
+    // The hour the clock is currently in, e.g. 14:37 -> 14:00.
+    const now = new Date();
+    const hourStart = now.getHours() * 60;
+    const hourEnd = hourStart + 60;
+    const nowMinutes = hourStart + now.getMinutes();
+
+    // First slot of the current hour; if the slots don't line up with the hour
+    // (custom slot alignment) fall back to the slot containing "now".
+    let startIndex = slots.findIndex(s => s.minutes === hourStart);
+    if (startIndex < 0) {
+        startIndex = slots.filter(s => s.minutes <= nowMinutes).length - 1;
+    }
+    if (startIndex < 0) {
+        // The current hour isn't rendered at all (slotMinTime / slotMaxTime).
+        clearNowBand();
+        return;
+    }
+
+    const startSlot = slots[startIndex];
+
+    // End of the band: the slot that starts the next hour, else a full hour of
+    // measured row heights (also covers the 24:00 bottom edge of the grid).
+    const endSlot = slots.find(s => s.minutes === hourEnd);
+    let bandBottom;
+    if (endSlot) {
+        bandBottom = endSlot.top;
+    } else {
+        const slotMinutes = slots[1].minutes - slots[0].minutes;
+        const hourRows = slotMinutes > 0 ? Math.max(1, Math.round(60 / slotMinutes)) : 1;
+        bandBottom = startSlot.top + startSlot.height * hourRows;
+    }
+
+    const topPct = Math.max(0, Math.min(100, startSlot.top / colRect.height * 100));
+    const heightPct = Math.max(0, Math.min(100 - topPct, (bandBottom - startSlot.top) / colRect.height * 100));
+
+    calendarEl.style.setProperty('--fc-now-band-top', topPct.toFixed(2) + '%');
+    calendarEl.style.setProperty('--fc-now-band-height', heightPct.toFixed(2) + '%');
+}
+
+/**
+ * Remove the current-hour highlight (used outside the time-grid views and when
+ * the current hour isn't part of the rendered grid).
+ */
+function clearNowBand() {
+    if (!calendarEl) return;
+    calendarEl.style.removeProperty('--fc-now-band-top');
+    calendarEl.style.removeProperty('--fc-now-band-height');
+}
+
+/**
+ * Parse FullCalendar's slot time format ("HH:MM:SS") into minutes past
+ * midnight; returns null when the value can't be parsed.
+ */
+function parseSlotTime(timeStr) {
+    if (!timeStr) return null;
+    const parts = timeStr.split(':');
+    if (parts.length < 2) return null;
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+    if (isNaN(hours) || isNaN(minutes)) return null;
+    return hours * 60 + minutes;
+}
+
