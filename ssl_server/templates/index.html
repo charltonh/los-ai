@@ -477,9 +477,19 @@
                         </h2>
 
                         <div class="ai-controls">
-                            <label class="ai-thinking-toggle" title="Show thinking/debug output from AI">
-                                <input type="checkbox" id="ai-show-thinking">
-                                <span class="ai-thinking-label">Thinking</span>
+                            <label class="ai-history-toggle" title="How many conversation blocks (prompt + response) to include in the AI context">
+                                <span class="ai-history-label">History:</span>
+                                <select id="ai-history-limit" class="ai-history-select">
+                                    <option value="all" selected>all</option>
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="3">3</option>
+                                    <option value="5">5</option>
+                                    <option value="8">8</option>
+                                    <option value="12">12</option>
+                                    <option value="16">16</option>
+                                    <option value="20">20</option>
+                                </select>
                             </label>
                             <button id="ai-clear-btn" class="editor-btn" title="Clear AI window"><i class="fas fa-eraser"></i> Clear</button>
                             <button id="ai-send-btn" class="editor-btn" title="Send prompt to AI"><i class="fas fa-paper-plane"></i> Send</button>

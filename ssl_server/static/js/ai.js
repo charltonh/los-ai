@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const aiOutput        = document.getElementById('ai-output');
     const aiSendBtn       = document.getElementById('ai-send-btn');
     const aiClearBtn      = document.getElementById('ai-clear-btn');
-    const aiShowThinking  = document.getElementById('ai-show-thinking');
+    const aiHistoryLimit  = document.getElementById('ai-history-limit');
     // Custom AI-config dropdown elements
     const customSelectEl  = document.getElementById('ai-custom-select');
     const customTriggerEl = document.getElementById('ai-select-trigger');
@@ -251,13 +251,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        if (aiShowThinking) {
-            aiShowThinking.addEventListener('change', () => {
-                const thinkEl = document.getElementById('ai-thinking-section');
-                if (thinkEl) thinkEl.style.display = aiShowThinking.checked ? 'block' : 'none';
-            });
-        }
-
         // Keep hidden select in sync with custom dropdown
         if (aiConfigSelect) {
             aiConfigSelect.addEventListener('change', syncTrigger);
@@ -419,6 +412,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
+     * Context-history depth defaults for the "hist:" dropdown:
+     *   - selecting a task    → "all"
+     *   - selecting an entity → "3"
+     */
+    function defaultHistoryLimit() {
+        return contextMode === 'entity' ? '3' : 'all';
+    }
+
+    function resetHistoryLimit() {
+        if (aiHistoryLimit) aiHistoryLimit.value = defaultHistoryLimit();
+    }
+
+    /**
      * Switch context mode.
      *  - 'task'   : restore the cached task selection (if any), keep canvas in sync.
      *  - 'entity' : clear the Task Editor (silently), load the entity's history into the canvas,
@@ -428,6 +434,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function setContextMode(mode, subName = '') {
         contextMode = mode;
         currentSubEntityName = (mode === 'entity') ? (subName || '') : '';
+        resetHistoryLimit();
         syncContextTrigger();
         applyContextMode();
     }
@@ -495,6 +502,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Re-apply so the entity path label / canvas reflect the new agenda.
                 applyContextMode();
                 syncContextTrigger();
+                resetHistoryLimit();   // entity default: 3 blocks
             }
             // Existing behavior: auto-select the matching AI config for this entity.
             // When already in entity mode, history (loaded by applyContextMode) takes priority;
@@ -527,6 +535,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentSubEntityName = '';
                 syncContextTrigger();
             }
+            // A task selection resets the history depth to the task default ("all").
+            resetHistoryLimit();
 
             // If already on this task, don't clear/reload (history & editor are already showing it).
             if (taskId === currentTaskId) return;
@@ -572,7 +582,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Show the last assistant response in the AI window
                 const lastAssistant = [...history].reverse().find(m => m.role === 'assistant');
                 if (lastAssistant) {
-                    showResponseInOutput(lastAssistant.content, lastAssistant.thinking, 0,
+                    showResponseInOutput(lastAssistant.content, 0,
                         lastAssistant.label, lastAssistant.timestamp);
                 } else {
                     setAiOutputPlaceholder();
@@ -590,19 +600,10 @@ document.addEventListener('DOMContentLoaded', () => {
      * Render a full AI response in the AI output area.
      * No truncation — shows everything in a scrollable pre.
      */
-    function showResponseInOutput(content, thinking, returncode, label, timestamp) {
+    function showResponseInOutput(content, returncode, label, timestamp) {
         if (!aiOutput) return;
 
         let html = '';
-
-        // Thinking block (if any and toggle is checked)
-        if (thinking && aiShowThinking && aiShowThinking.checked) {
-            html += `
-                <details id="ai-thinking-section" class="ai-thinking-block" open>
-                    <summary><i class="fas fa-brain"></i> Thinking</summary>
-                    <pre class="ai-thinking-text">${escapeHtml(thinking)}</pre>
-                </details>`;
-        }
 
         if (returncode !== 0 && returncode != null) {
             html += `<div class="ai-error" style="margin-bottom:0.5rem"><i class="fas fa-exclamation-triangle"></i> Exited with code ${returncode}</div>`;
@@ -702,12 +703,16 @@ document.addEventListener('DOMContentLoaded', () => {
             // Forward the active Context mode + entity path so the server can
             // tell aicall.py to inject the entity's identity/omni/goals
             // (when mode == 'entity') and skip irrelevant context blocks.
+            // "hist:" is how many conversation blocks (prompt + response) the
+            // server tells aicall.py to pull from history.json.
+            const historyLimit = aiHistoryLimit ? aiHistoryLimit.value : 'all';
             const streamBody = {
                 label:        selectedLabel,
                 prompt:       fullPrompt,
                 context_mode: contextMode,
                 entity_path:  (contextMode === 'entity') ? getActiveEntityPath() : (currentTaskPath || ''),
                 project_id:   currentTaskId || null,
+                history_limit: historyLimit,
             };
             const streamResp = await fetch('/api/ai/stream', {
                 method: 'POST',
@@ -738,7 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // 1. Show full output in the AI window immediately
-                showResponseInOutput(output || '', thinking || null, returncode, selectedLabel, new Date().toISOString());
+                showResponseInOutput(output || '', returncode, selectedLabel, new Date().toISOString());
 
                 // 2. Save assistant response to history
                 const saveTaskId = doneTaskId || currentTaskId;
@@ -751,16 +756,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     // sending a new HTTP POST on the same connection pool.
                     await new Promise(resolve => setTimeout(resolve, 150));
 
-                    // Don't save the raw thinking/debug buffer — it's aicall.py's verbose
-                    // stderr debug output (17KB+). Only save it if it's a real model
-                    // chain-of-thought (short, meaningful). Threshold: < 4KB.
-                    const thinkingToSave = (thinking && thinking.length < 4096) ? thinking : null;
                     await appendToHistory(saveTaskId, savePath, {
                         role: 'assistant',
                         label: selectedLabel,
                         type: configType,
                         content: output.trim(),
-                        thinking: thinkingToSave,
                         returncode: returncode
                     });
                 }
@@ -856,7 +856,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await resp.json();
                 if (data.pending) {
                     clearInterval(interval);
-                    showResponseInOutput(data.message, null, 0, 'Agent (Late Delivery)', new Date().toISOString());
+                    showResponseInOutput(data.message, 0, 'Agent (Late Delivery)', new Date().toISOString());
                     if (window.canvasAPI) window.canvasAPI.refreshAndExpandLast(taskId);
                     isAiLoading = false;
                     if (aiSendBtn) {

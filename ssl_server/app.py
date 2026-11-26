@@ -1568,6 +1568,14 @@ def generate_cron_calendar_events(entity_abs_path, start_range=None, end_range=N
                 except (ValueError, TypeError):
                     continue
 
+                # Normalize timezone-aware anchors (e.g. "2026-11-24T08:53:00-06:00")
+                # to naive server-local wall clock. Every comparison below runs
+                # against naive start_range/end_range built from datetime.now(),
+                # and an aware anchor would raise TypeError here — aborting the
+                # whole overlay so ALL cron items vanish from the calendar.
+                if anchor_dt.tzinfo is not None:
+                    anchor_dt = anchor_dt.astimezone().replace(tzinfo=None)
+
                 days = interval.get('days', 0)
                 hours = interval.get('hours', 0)
                 minutes = interval.get('minutes', 0)
@@ -1589,57 +1597,64 @@ def generate_cron_calendar_events(entity_abs_path, start_range=None, end_range=N
                 # If the anchor falls before `start_range`, fast-forward in
                 # whole `delta` steps so we don't iterate uselessly through
                 # potentially years of past instances.
-                current_dt = anchor_dt
-                if current_dt < start_range:
-                    skip_steps = int(
-                        (start_range - current_dt).total_seconds() // delta.total_seconds()
-                    )
-                    if skip_steps > 0:
-                        current_dt = current_dt + delta * skip_steps
+                try:
+                    current_dt = anchor_dt
+                    if current_dt < start_range:
+                        skip_steps = int(
+                            (start_range - current_dt).total_seconds() // delta.total_seconds()
+                        )
+                        if skip_steps > 0:
+                            current_dt = current_dt + delta * skip_steps
 
-                count = 0
-                # Always emit the anchor as the first instance when it falls
-                # within the visible range (handled naturally by the loop
-                # below since we start `current_dt` at `anchor_dt`).
-                while current_dt <= end_range and count < 200:
-                    if current_dt >= start_range:
-                        date_key = current_dt.strftime('%Y-%m-%d')
-                        # Skip if a physical persisted copy of this exact
-                        # occurrence already exists (e.g. user marked it
-                        # "done" in the editor); the persisted version wins.
-                        if (entry_id, date_key) not in persisted_keys:
-                            is_anchor = (current_dt == anchor_dt)
-                            # Each occurrence gets a unique instance ID so that
-                            # marking one "done" doesn't interfere with other
-                            # occurrences of the same cycle entry.
-                            # Format: {entry_id}_{YYYYMMDD} or {entry_id}_{YYYYMMDD}_{HHMM}
-                            if is_all_day:
-                                instance_id = f"{entry_id}_{date_key.replace('-', '')}"
-                                start_value = date_key
-                            else:
-                                instance_id = f"{entry_id}_{current_dt.strftime('%Y%m%d_%H%M')}"
-                                start_value = current_dt.isoformat()
-                            event_data = {
-                                'id': instance_id,
-                                'title': f'🔄 {title}',
-                                'start': start_value,
-                                'allDay': is_all_day,
-                                'backgroundColor': color,
-                                'borderColor': color,
-                                'editable': False,
-                                'extendedProps': {
-                                    'description': description,
-                                    'source': 'cron',
-                                    'cron_id': entry_id,
-                                    'cron_type': entry_type,
-                                    'cron_action': action,
-                                    'source_filename': source_filename,
-                                    'is_anchor': is_anchor
+                    count = 0
+                    # Always emit the anchor as the first instance when it falls
+                    # within the visible range (handled naturally by the loop
+                    # below since we start `current_dt` at `anchor_dt`).
+                    while current_dt <= end_range and count < 200:
+                        if current_dt >= start_range:
+                            date_key = current_dt.strftime('%Y-%m-%d')
+                            # Skip if a physical persisted copy of this exact
+                            # occurrence already exists (e.g. user marked it
+                            # "done" in the editor); the persisted version wins.
+                            if (entry_id, date_key) not in persisted_keys:
+                                is_anchor = (current_dt == anchor_dt)
+                                # Each occurrence gets a unique instance ID so that
+                                # marking one "done" doesn't interfere with other
+                                # occurrences of the same cycle entry.
+                                # Format: {entry_id}_{YYYYMMDD} or {entry_id}_{YYYYMMDD}_{HHMM}
+                                if is_all_day:
+                                    instance_id = f"{entry_id}_{date_key.replace('-', '')}"
+                                    start_value = date_key
+                                else:
+                                    instance_id = f"{entry_id}_{current_dt.strftime('%Y%m%d_%H%M')}"
+                                    start_value = current_dt.isoformat()
+                                event_data = {
+                                    'id': instance_id,
+                                    'title': f'🔄 {title}',
+                                    'start': start_value,
+                                    'allDay': is_all_day,
+                                    'backgroundColor': color,
+                                    'borderColor': color,
+                                    'editable': False,
+                                    'extendedProps': {
+                                        'description': description,
+                                        'source': 'cron',
+                                        'cron_id': entry_id,
+                                        'cron_type': entry_type,
+                                        'cron_action': action,
+                                        'source_filename': source_filename,
+                                        'is_anchor': is_anchor
+                                    }
                                 }
-                            }
-                            virtual_events.append(event_data)
-                    current_dt += delta
-                    count += 1
+                                virtual_events.append(event_data)
+                        current_dt += delta
+                        count += 1
+                except Exception as e:
+                    # Per-entry guard: never let one malformed entry abort the
+                    # whole overlay (which wipes every cron item, enabled or
+                    # not) — skip just this entry and keep generating the rest.
+                    print(f"Error generating cycle events for '{title}' (id={entry_id}): {e}")
+                    continue
 
     return virtual_events
 
@@ -2585,6 +2600,19 @@ def add_crontab():
     entry.setdefault('anchor', None)
     entry.setdefault('last_run', None)
 
+    # Write-time normalization: agents/editors can submit a timezone-aware
+    # anchor (e.g. "2026-11-24T08:53:00-06:00"); every consumer of data/cron/
+    # compares anchors against naive datetime.now(), so store the naive
+    # server-local form instead — aware anchors crash the calendar overlay
+    # and the loscron daemon (can't compare offset-naive and offset-aware).
+    if isinstance(entry.get('anchor'), str):
+        try:
+            parsed_anchor = datetime.fromisoformat(entry['anchor'])
+            if parsed_anchor.tzinfo is not None:
+                entry['anchor'] = parsed_anchor.astimezone().replace(tzinfo=None).isoformat()
+        except (ValueError, TypeError):
+            pass
+
     # Remove source_file/source_filename if client sent them (internal fields)
     entry.pop('source_file', None)
     entry.pop('source_filename', None)
@@ -2639,6 +2667,17 @@ def update_crontab(entry_id):
     # Remove internal fields before saving
     updated_entry_data.pop('source_file', None)
     updated_entry_data.pop('source_filename', None)
+
+    # Write-time normalization (same rationale as add_crontab): keep stored
+    # anchors naive server-local, since all consumers compare them against
+    # naive datetime.now().
+    if isinstance(updated_entry_data.get('anchor'), str):
+        try:
+            parsed_anchor = datetime.fromisoformat(updated_entry_data['anchor'])
+            if parsed_anchor.tzinfo is not None:
+                updated_entry_data['anchor'] = parsed_anchor.astimezone().replace(tzinfo=None).isoformat()
+        except (ValueError, TypeError):
+            pass
 
     success, filepath = find_and_modify_cron_entry(
         entity_abs_path, entry_id, operation='update', new_data=updated_entry_data
@@ -4335,7 +4374,7 @@ def _cleanup_stream(stream_id):
 
 def _run_aicall_streaming(stream_id, aicall_path, label, prompt, username, timeout,
                           project_id=None, entity_path=None, context_mode='task',
-                          job_id=None):
+                          job_id=None, history_limit='all'):
     """Run aicall in a subprocess, pushing output lines to the stream queue.
 
     Env vars set for the subprocess control system-prompt assembly in aicall.py:
@@ -4343,6 +4382,8 @@ def _run_aicall_streaming(stream_id, aicall_path, label, prompt, username, timeo
       LOS_ENTITY_REL_PATH      – when context_mode='entity', the relative entity path
       LOS_SKIP_TASKS_DUMP      – 1 → omit the full agenda-wide CURRENT TASKS section
       LOS_SKIP_MEMORY_CONTEXT  – 1 → omit the memory-based RECENT CONVERSATION block
+      LOS_HISTORY_LIMIT        – how many conversation blocks (prompt + response) to
+                                 inject from history.json; 'all' or 1/2/3/5/8/12/16/20
       LOS_PROJECT_TOKEN        – per-project Bearer token (new)
       LOS_REPORT_URL           – full URL agents POST to with their responses (new)
       LOS_JOB_ID               – job identifier for this invocation (new)
@@ -4398,6 +4439,9 @@ def _run_aicall_streaming(stream_id, aicall_path, label, prompt, username, timeo
         'LOS_CONTEXT_MODE':      context_mode or 'task',
         'LOS_SKIP_TASKS_DUMP':   '1',
         'LOS_SKIP_MEMORY_CONTEXT': '1',
+        # How many conversation blocks (prompt + response) aicall.py injects
+        # from history.json — the AI window's "hist:" control.
+        'LOS_HISTORY_LIMIT':     history_limit or 'all',
         'LOS_PROJECT_TOKEN':     project_token,
         'LOS_REPORT_URL':        report_url,
         'LOS_JOB_ID':            job_id,
@@ -4580,6 +4624,13 @@ def api_ai_stream_start():
     if context_mode not in ('task', 'entity', 'none'):
         context_mode = 'task'
 
+    # The AI window's "hist:" dropdown: how many conversation blocks (prompt +
+    # response) aicall.py injects from history.json.  'all' keeps the legacy
+    # label-aware window; anything else is one of the offered depths.
+    history_limit = str(data.get('history_limit', 'all')).strip().lower()
+    if history_limit not in ('all', '1', '2', '3', '5', '8', '12', '16', '20'):
+        history_limit = 'all'
+
     # Generate a job_id for tracking this invocation in the project's jobs/
     job_id    = f"job_{uuid.uuid4().hex[:12]}"
     stream_id = str(uuid.uuid4())
@@ -4589,6 +4640,7 @@ def api_ai_stream_start():
         'project_id': data.get('project_id'), 'entity_path': data.get('entity_path'),
         'context_mode': context_mode,
         'job_id': job_id,
+        'history_limit': history_limit,
     }
 
     with _active_streams_lock:
@@ -4602,6 +4654,7 @@ def api_ai_stream_start():
             'entity_path':  data.get('entity_path'),
             'context_mode': context_mode,
             'job_id':       job_id,
+            'history_limit': history_limit,
         },
         daemon=True
     )

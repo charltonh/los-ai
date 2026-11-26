@@ -1,6 +1,15 @@
 
 # Changelog
 
+## [1.0.4] - 2026-11-26
+### Added
+- Conversation History dropdown
+### Fixed
+- Fixed hermes agent Exit-1 bug
+### Removed
+- Removed deprecated Thinking tikbox
+
+
 ## [1.0.4] - 2026-09-25
 ### Added
 - Version info in the LOS Dashboard

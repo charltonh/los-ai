@@ -2614,6 +2614,48 @@ body.sidebar-visible .dashboard {
     font-size: var(--font-size-sm);
 }
 
+.ai-history-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin-right: var(--spacing-sm);
+    /* Match the Clear / Send buttons beside it: inherit the window header's
+       UI font, size and weight instead of forcing a smaller label font. */
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    color: inherit;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.ai-history-label {
+    font-size: inherit;
+    font-weight: inherit;
+}
+
+.ai-history-select {
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    background: transparent;
+    color: inherit;
+    border: 1px solid rgba(128, 128, 128, 0.45);
+    border-radius: 4px;
+    padding: 3px 7px;
+    cursor: pointer;
+}
+
+.ai-history-select:hover,
+.ai-history-select:focus {
+    border-color: var(--accent-color);
+    outline: none;
+}
+
+.ai-history-select option {
+    color: #111;
+}
+
 /* AI Container Layout */
 .ai-container {
     display: flex;

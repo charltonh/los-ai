@@ -337,6 +337,13 @@ def should_fire_cycle(entry, now):
         logger.warning(f"Invalid anchor datetime for entry {entry.get('id')}: {anchor}")
         return False
 
+    # Normalize timezone-aware anchors (e.g. "2026-11-24T08:53:00-06:00") to
+    # naive server-local wall clock: the firing pipeline compares against the
+    # naive datetime.now() passed by run_check, and an aware anchor would
+    # raise TypeError at the comparison below and abort the entire check pass.
+    if anchor_dt.tzinfo is not None:
+        anchor_dt = anchor_dt.astimezone().replace(tzinfo=None)
+
     # Calculate interval as timedelta
     days = interval.get('days', 0)
     hours = interval.get('hours', 0)
@@ -353,6 +360,9 @@ def should_fire_cycle(entry, now):
     if last_run:
         try:
             reference_dt = datetime.fromisoformat(last_run)
+            # Keep aware last_run values comparable with naive `now` too.
+            if reference_dt.tzinfo is not None:
+                reference_dt = reference_dt.astimezone().replace(tzinfo=None)
         except (ValueError, TypeError):
             reference_dt = anchor_dt
 
@@ -582,12 +592,20 @@ def run_check():
             entry_type = entry.get('type', '')
             should_fire = False
 
-            if entry_type == 'date':
-                should_fire = should_fire_date(entry, now)
-            elif entry_type == 'cron':
-                should_fire = should_fire_cron(entry, now)
-            elif entry_type == 'cycle':
-                should_fire = should_fire_cycle(entry, now)
+            # Per-entry guard: one malformed entry must never abort the whole
+            # check pass (the outer handler catches it and every entry after
+            # it in this dir — and all later dirs — would starve silently).
+            try:
+                if entry_type == 'date':
+                    should_fire = should_fire_date(entry, now)
+                elif entry_type == 'cron':
+                    should_fire = should_fire_cron(entry, now)
+                elif entry_type == 'cycle':
+                    should_fire = should_fire_cycle(entry, now)
+            except Exception as e:
+                logger.error(f"Error evaluating entry {entry.get('id')} "
+                             f"({entry.get('title', 'Untitled')}): {e} — skipping entry")
+                continue
 
             if should_fire:
                 fired_entries += 1

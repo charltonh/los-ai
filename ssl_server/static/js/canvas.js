@@ -316,7 +316,6 @@
                     const rc     = pair.assistant.returncode;
                     const rcBadge = (rc != null && rc !== 0)
                         ? `<span class="canvas-rc-error">exit ${rc}</span>` : '';
-                    const thinking = pair.assistant.thinking;
 
                     html += `
                         <div class="canvas-pair-section canvas-pair-section-assistant">
@@ -326,12 +325,6 @@
                                 ${rcBadge}
                                 <button class="canvas-copy-btn" data-copy-idx="${idx}" data-copy-role="assistant" title="Copy response">📋 Copy</button>
                             </div>
-                            ${thinking ? `
-                                <details class="canvas-thinking-details">
-                                    <summary>Thinking…</summary>
-                                    <pre class="canvas-code" style="opacity:0.7">${escHtml(thinking.trim())}</pre>
-                                </details>
-                            ` : ''}
                             <div class="canvas-pair-section-content canvas-response-text">${formatContent(pair.assistant.content)}</div>
                         </div>
                     `;

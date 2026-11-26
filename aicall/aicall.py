@@ -1742,8 +1742,10 @@ def _build_agent_tool_context(config=None, callback_block='', user_prompt='',
         history_file = os.getenv('LOS_HISTORY_FILE', '')
         if history_file:
             history_hours = 4 if context_mode == 'entity' else None
+            history_limit = _history_limit_from_env()
             try:
-                raw_history = load_project_history(history_file, label, hours=history_hours)
+                raw_history = load_project_history(history_file, label, hours=history_hours,
+                                                   max_blocks=history_limit)
                 if raw_history:
                     # For the agent we render a compact text block rather than
                     # injecting raw chat messages (the agent is an external
@@ -1752,7 +1754,8 @@ def _build_agent_tool_context(config=None, callback_block='', user_prompt='',
                                                          header="RECENT PROJECT HISTORY"))
                     if GLOBAL_DEBUG_MODE and not _is_whatsapp():
                         print(f"[agent] project_history injected: len={len(raw_history)} "
-                              f"hours={history_hours}", file=sys.stderr)
+                              f"hours={history_hours} blocks={history_limit or 'all'}",
+                              file=sys.stderr)
             except Exception as e:
                 if GLOBAL_DEBUG_MODE and not _is_whatsapp():
                     print(f"[agent] project_history error: {e}", file=sys.stderr)
@@ -1900,6 +1903,70 @@ def _is_unsupported_thinking_error(stderr_text):
         stderr_text, re.IGNORECASE))
 
 
+def _strip_thinking_blocks(text):
+    """Remove inline chain-of-thought a reasoning model may leak into a reply.
+
+    Agents sometimes wrap their scratchpad in `` thinking...</think>`` (or
+    ``<thinking>``) before the answer.  Those blocks are internal reasoning and
+    must never be forwarded to the user as part of the response.
+    """
+    if not text:
+        return text or ''
+    cleaned = re.sub(r'<think(?:ing)?>.*?</think(?:ing)?>', '', text,
+                     flags=re.DOTALL | re.IGNORECASE)
+    return cleaned.strip()
+
+
+# Hermes stderr fragments that mean "the gateway is unavailable", not "the
+# model produced nothing".  Hermes makes the gateway the single writer for
+# sessions, so `chat --continue <name> --create-if-missing` cannot create a
+# session (and prints nothing on stdout) when no gateway is running.
+_HERMES_GATEWAY_FAILURE_PATTERNS = (
+    'service_manager_unavailable',
+    'gateway inaccessible',
+    'gateway is not running',
+    'gateway not running',
+    'could not start the gateway',
+    'could not be created',
+    'no session found matching',
+    'gateway connection failed',
+    'no local fallback',
+)
+
+
+def _hermes_gateway_failure_hint(stderr_text):
+    """
+    Return an actionable fix when Hermes failed because its gateway is
+    unavailable, or None when stderr does not point at the gateway.
+
+    Without this, a down gateway surfaces only as the opaque
+    "Hermes returned no output on stdout." — the CLI's own stderr already
+    says e.g. "Gateway inaccessible: service_manager_unavailable" or
+    "No session found matching '...' and a new titled session could not be
+    created", so translate that into the actual remedy.
+    """
+    if not stderr_text:
+        return None
+    lowered = stderr_text.lower()
+    if not any(pattern in lowered for pattern in _HERMES_GATEWAY_FAILURE_PATTERNS):
+        return None
+    return (
+        "Hermes gateway is not running or unreachable, so the agent could not "
+        "create/resume its session. Start the gateway and retry:\n"
+        "  hermes gateway run        # foreground (or run it under a supervisor)\n"
+        "  hermes gateway status     # expect: Gateway is running\n"
+        "Logs: ~/.hermes/logs/gateway.log"
+    )
+
+
+def _tail_text(text, limit=600):
+    """Return the tail of ``text`` (<= ``limit`` chars) as a trimmed block."""
+    if not text:
+        return ''
+    text = text.strip()
+    return text if len(text) <= limit else '...' + text[-limit:]
+
+
 def _invoke_hermes(bin_path, agent_id, message, thinking, timeout,
                    session_id=None, agent_config=None):
     """
@@ -1919,17 +1986,16 @@ def _invoke_hermes(bin_path, agent_id, message, thinking, timeout,
     """
     cfg = agent_config or {}
 
-    # Hermes reasoning levels: none, minimal, low, medium, high, xhigh, max, ultra.
-    # LOS thinking values map directly for low/medium/high.
-    thinking_map = {
-        'low': 'low',
-        'medium': 'medium',
-        'high': 'high',
-    }
-    hermes_reasoning = thinking_map.get((thinking or '').lower(), 'medium')
-
-    # Hermes max tool-calling iterations per conversation turn.
-    max_turns = int(cfg.get('max_turns', 100))
+    # Do NOT pass --max-turns / --reasoning on this invocation.  The dispatch
+    # creates a fresh titled session (--create-if-missing) and then resumes it,
+    # and Hermes freezes each session's launch policy at creation; resume refuses
+    # creation overrides that differ ("Resume retains gateway session policy;
+    # creation overrides are unsupported on resume"), so the CLI would exit
+    # non-zero with nothing on stdout every time the gateway is not the one
+    # minting the row.  Hermes applies its own configured defaults instead
+    # (config.yaml: max_turns 750, reasoning_effort).  The LOS-side `thinking`
+    # level and `max_turns` still cap LOS's own step loop; they no longer tune
+    # the Hermes side.
 
     # Use the LOS session_id as the Hermes session name.  If no session_id was
     # supplied, generate a one-shot name.
@@ -1937,9 +2003,7 @@ def _invoke_hermes(bin_path, agent_id, message, thinking, timeout,
 
     cmd = [bin_path, 'chat',
            '-Q',                         # quiet / programmatic output
-           '--max-turns', str(max_turns),
-           '--reasoning', hermes_reasoning,
-           '--no-restore-cwd',
+           '--no-restore-cwd',           # hermes keeps the session's frozen cwd
            '--continue', session_name,
            '--create-if-missing',
            '--accept-hooks']             # auto-approve unseen shell hooks
@@ -1976,14 +2040,30 @@ def _invoke_hermes(bin_path, agent_id, message, thinking, timeout,
 
         stdout = result.stdout.strip()
         if not stdout:
+            hint = _hermes_gateway_failure_hint(result.stderr)
+            if hint:
+                raise RuntimeError(
+                    f"{hint}\n\nHermes said:\n{_tail_text(result.stderr)}")
             raise RuntimeError("Hermes returned no output on stdout.")
 
         # Quiet mode prints: "session_id: <id>\n<response>"
         lines = stdout.split('\n', 1)
-        if len(lines) > 1 and lines[0].startswith('session_id:'):
-            response_text = lines[1]
+        if lines[0].startswith('session_id:'):
+            response_text = lines[1] if len(lines) > 1 else ''
         else:
             response_text = stdout
+
+        # A stdout that is only the banner's session line means Hermes created
+        # or resumed the session but produced no answer (a gateway-side failure
+        # still lands on stderr); surface the gateway hint instead of handing
+        # the session id back as the agent's reply.
+        if not response_text.strip():
+            hint = _hermes_gateway_failure_hint(result.stderr)
+            if hint:
+                raise RuntimeError(
+                    f"{hint}\n\nHermes said:\n{_tail_text(result.stderr)}")
+            raise RuntimeError(
+                "Hermes returned no response text (stdout had only the session id).")
 
         # Hermes quiet mode does not report the model; use aiconfig model or provider.
         model = cfg.get('model') or cfg.get('provider', 'hermes')
@@ -2460,7 +2540,7 @@ def call_agent(agent_config, prompt, los_config=None):
                     print(color("agent responded with: LLM request filed", 'bright_red', 'bold'),
                           file=sys.stderr)
                     sys.exit(1)
-                final_text = response_text
+                final_text = _strip_thinking_blocks(response_text)
                 break
 
             # Only log intermediate (tool-call) turns as AGENT_RESPONSE.
@@ -2529,6 +2609,8 @@ def call_agent(agent_config, prompt, los_config=None):
                 final_text = ("Reached the maximum number of tool steps "
                               f"({max_steps}) without a final answer.")
 
+        # Never forward a leaked chain-of-thought block as the answer.
+        final_text = _strip_thinking_blocks(final_text)
         if not final_text:
             final_text = "Agent produced no final response."
 
@@ -2612,7 +2694,25 @@ def _format_history_block(messages, header="RECENT PROJECT HISTORY"):
     return "\n".join(lines)
 
 
-def load_project_history(history_file, current_label, hours=None):
+def _history_limit_from_env():
+    """
+    Read LOS_HISTORY_LIMIT — the AI window's "hist:" control.
+
+    Returns the number of conversation blocks (prompt + response) to inject,
+    or None for "all" (the label-aware full window).  Unset/invalid values
+    mean "all" so non-UI callers keep the previous behaviour.
+    """
+    raw = (os.getenv('LOS_HISTORY_LIMIT') or '').strip().lower()
+    if not raw or raw == 'all':
+        return None
+    try:
+        blocks = int(raw)
+    except ValueError:
+        return None
+    return blocks if blocks > 0 else None
+
+
+def load_project_history(history_file, current_label, hours=None, max_blocks=None):
     """
     Load prior conversation turns from history.json for LLM context injection.
 
@@ -2629,6 +2729,12 @@ def load_project_history(history_file, current_label, hours=None):
         are kept. This is used in entity-mode chats so the prompt carries the
         recent conversation the canvas is showing, not everything since the
         dawn of time.
+
+    Optional `max_blocks` (e.g. 3):
+      - When provided, only the last N conversation blocks are kept.  A block
+        is one user prompt plus the assistant response(s) that follow it;
+        blocks start at user messages.  This is the AI window's "hist:"
+        control ("all" → None → no limit).
 
     The trailing user message is always dropped: ai.js pre-saves the current
     prompt to history.json just before launching the stream, so the final user
@@ -2709,6 +2815,19 @@ def load_project_history(history_file, current_label, hours=None):
             start_idx = pair_start
 
     relevant = entries[start_idx:]
+
+    # ── Optional conversation-block limit (AI window's "hist:" control) ────
+    # Keep only the last N blocks.  Blocks start at user messages, so slice
+    # from the Nth-from-last user turn and keep everything that follows.
+    if max_blocks is not None:
+        try:
+            max_blocks = int(max_blocks)
+        except (ValueError, TypeError):
+            max_blocks = None
+    if max_blocks is not None and max_blocks > 0:
+        user_positions = [i for i, e in enumerate(relevant) if e['role'] == 'user']
+        if len(user_positions) > max_blocks:
+            relevant = relevant[user_positions[-max_blocks]:]
 
     # Skip any leading orphan assistant messages so the first injected message
     # is always a user turn (required by OpenAI-style chat APIs).
@@ -2819,10 +2938,14 @@ def main():
         # label-aware history window.
         context_mode = os.getenv('LOS_CONTEXT_MODE', 'task')
         history_hours = 4 if context_mode == 'entity' else None
-        prior_messages = load_project_history(history_file, args.label, hours=history_hours)
+        history_limit = _history_limit_from_env()
+        prior_messages = load_project_history(history_file, args.label,
+                                              hours=history_hours,
+                                              max_blocks=history_limit)
         if prior_messages:
             print(color(f"[history] {len(prior_messages)} prior message(s) injected from {history_file}"
-                        f" (context={context_mode}, hours={history_hours})", 'cyan'), file=sys.stderr)
+                        f" (context={context_mode}, hours={history_hours}, "
+                        f"blocks={history_limit or 'all'})", 'cyan'), file=sys.stderr)
         else:
             print(color(f"[history] No prior messages to inject (file={history_file or 'not set'}, context={context_mode})", 'dim'), file=sys.stderr)
 

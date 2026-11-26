@@ -1424,7 +1424,13 @@ def use_tool(tool_name):
             if total_seconds <= 0:
                 return jsonify({"error": "'interval' must have at least one positive value (days, hours, or minutes)"}), 400
             try:
-                datetime.fromisoformat(anchor)
+                parsed_anchor = datetime.fromisoformat(anchor)
+                # Write-time normalization: store the naive server-local form.
+                # Every consumer (web calendar overlay, loscron daemon) compares
+                # anchors against naive datetime.now(); an aware anchor crashes
+                # them with "can't compare offset-naive and offset-aware datetimes".
+                if parsed_anchor.tzinfo is not None:
+                    anchor = parsed_anchor.astimezone().replace(tzinfo=None).isoformat()
             except (ValueError, TypeError):
                 return jsonify({"error": "'anchor' must be a valid ISO datetime string"}), 400
 
